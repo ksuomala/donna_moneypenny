@@ -1,0 +1,156 @@
+# This file is auto-generated from the current state of the database. Instead
+# of editing this file, please use the migrations feature of Active Record to
+# incrementally modify your database, and then regenerate this schema definition.
+#
+# This file is the source Rails uses to define your schema when running `bin/rails
+# db:schema:load`. When creating a new database, `bin/rails db:schema:load` tends to
+# be faster and is potentially less error prone than running all of your
+# migrations from scratch. Old migrations may fail to apply correctly if those
+# migrations use external dependencies or application code.
+#
+# It's strongly recommended that you check this file into your version control system.
+
+ActiveRecord::Schema[8.1].define(version: 2026_10_15_081759) do
+  create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "bank_account_id", null: false
+    t.date "on", null: false
+    t.decimal "booked", precision: 12, scale: 2, null: false
+    t.decimal "available", precision: 12, scale: 2
+    t.json "raw"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bank_account_id", "on"], name: "index_bank_account_balances_on_bank_account_id_and_on", unique: true
+    t.index ["bank_account_id"], name: "index_bank_account_balances_on_bank_account_id"
+  end
+
+  create_table "bank_accounts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "bank_connection_id", null: false
+    t.string "uid", null: false
+    t.string "iban"
+    t.string "name"
+    t.string "currency"
+    t.json "raw"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "identification_hash"
+    t.datetime "last_synced_at"
+    t.string "type"
+    t.index ["bank_connection_id"], name: "index_bank_accounts_on_bank_connection_id"
+    t.index ["iban"], name: "index_bank_accounts_on_iban"
+    t.index ["identification_hash"], name: "index_bank_accounts_on_identification_hash"
+    t.index ["type"], name: "index_bank_accounts_on_type"
+    t.index ["uid"], name: "index_bank_accounts_on_uid", unique: true
+  end
+
+  create_table "bank_connections", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "session_id", null: false
+    t.string "aspsp_name", null: false
+    t.string "aspsp_country", null: false
+    t.datetime "valid_until", null: false
+    t.integer "status", default: 0, null: false
+    t.json "raw"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["session_id"], name: "index_bank_connections_on_session_id", unique: true
+  end
+
+  create_table "bank_transactions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "bank_account_id", null: false
+    t.string "entry_reference", null: false
+    t.integer "status", default: 0, null: false
+    t.date "occurred_on", null: false
+    t.date "booking_date"
+    t.date "transaction_date"
+    t.date "value_date"
+    t.decimal "amount", precision: 12, scale: 2, null: false
+    t.string "currency", null: false
+    t.string "counterparty_name"
+    t.text "description"
+    t.string "reference_number"
+    t.string "merchant_category_code"
+    t.json "raw"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "transaction_category_id"
+    t.bigint "loan_id"
+    t.index ["bank_account_id", "entry_reference"], name: "index_bank_transactions_on_bank_account_id_and_entry_reference", unique: true
+    t.index ["bank_account_id", "occurred_on"], name: "index_bank_transactions_on_bank_account_id_and_occurred_on"
+    t.index ["bank_account_id"], name: "index_bank_transactions_on_bank_account_id"
+    t.index ["loan_id"], name: "index_bank_transactions_on_loan_id"
+    t.index ["transaction_category_id"], name: "index_bank_transactions_on_transaction_category_id"
+  end
+
+  create_table "expenses", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.decimal "amount", precision: 10, scale: 2, null: false
+    t.string "description", null: false
+    t.integer "category", default: 0, null: false
+    t.date "occurred_on", null: false
+    t.string "merchant"
+    t.integer "payment_method", default: 0, null: false
+    t.text "notes"
+    t.boolean "recurring", default: false, null: false
+    t.string "currency", default: "USD", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category"], name: "index_expenses_on_category"
+    t.index ["occurred_on"], name: "index_expenses_on_occurred_on"
+  end
+
+  create_table "incomes", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.decimal "amount", precision: 10, scale: 2, null: false
+    t.string "description", null: false
+    t.integer "source", default: 0, null: false
+    t.date "received_on", null: false
+    t.string "payer"
+    t.integer "payment_method", default: 0, null: false
+    t.text "notes"
+    t.boolean "recurring", default: false, null: false
+    t.string "currency", default: "USD", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["received_on"], name: "index_incomes_on_received_on"
+    t.index ["source"], name: "index_incomes_on_source"
+  end
+
+  create_table "loan_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "loan_id", null: false
+    t.date "on", null: false
+    t.decimal "balance", precision: 12, scale: 2, null: false
+    t.string "note"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["loan_id", "on"], name: "index_loan_balances_on_loan_id_and_on", unique: true
+    t.index ["loan_id"], name: "index_loan_balances_on_loan_id"
+  end
+
+  create_table "loans", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "creditor", null: false
+    t.text "description"
+    t.string "currency", default: "EUR", null: false
+    t.boolean "balance_from_transactions", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_loans_on_name", unique: true
+  end
+
+  create_table "transaction_categories", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "name", null: false
+    t.integer "kind"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.text "description"
+    t.bigint "parent_id"
+    t.boolean "exclude_from_stats", default: false, null: false
+    t.index ["name"], name: "index_transaction_categories_on_name", unique: true
+    t.index ["parent_id"], name: "index_transaction_categories_on_parent_id"
+  end
+
+  add_foreign_key "bank_account_balances", "bank_accounts"
+  add_foreign_key "bank_accounts", "bank_connections"
+  add_foreign_key "bank_transactions", "bank_accounts"
+  add_foreign_key "bank_transactions", "loans"
+  add_foreign_key "bank_transactions", "transaction_categories", on_delete: :nullify
+  add_foreign_key "loan_balances", "loans"
+  add_foreign_key "transaction_categories", "transaction_categories", column: "parent_id"
+end

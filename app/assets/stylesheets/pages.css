@@ -1,0 +1,88 @@
+.page {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 3rem 1rem 4rem;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
+  color: #1f2937;
+}
+
+.page h2 {
+  margin-bottom: 0;
+  font-size: 1.2rem;
+}
+
+.muted {
+  color: #6b7280;
+}
+
+.page-nav {
+  font-size: 0.9rem;
+}
+
+.page-nav a {
+  color: #1d4ed8;
+}
+
+.button {
+  padding: 0.6rem 1.2rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: #1d4ed8;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #1e40af;
+}
+
+.flash {
+  padding: 0.75rem 1rem;
+  border-radius: 0.4rem;
+}
+
+.flash-notice {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.flash-alert {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.connection {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    color: #e5e7eb;
+  }
+
+  .muted {
+    color: #9ca3af;
+  }
+
+  .page-nav a {
+    color: #93c5fd;
+  }
+
+  .flash-notice {
+    background: #14532d;
+    color: #dcfce7;
+  }
+
+  .flash-alert {
+    background: #7f1d1d;
+    color: #fee2e2;
+  }
+
+  .connection {
+    border-top-color: #374151;
+  }
+}

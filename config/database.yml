@@ -1,0 +1,43 @@
+# MySQL. Versions 5.7 and up are supported.
+#
+#   gem install mysql2
+#
+#   Ensure the MySQL gem is defined in your Gemfile
+#   gem "mysql2"
+#
+default: &default
+  adapter: mysql2
+  encoding: utf8mb4
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  host: <%= ENV.fetch("DB_HOST", "127.0.0.1") %>
+  port: <%= ENV.fetch("DB_PORT", 3306) %>
+  username: <%= ENV.fetch("DB_USERNAME", "root") %>
+  password: <%= ENV.fetch("DB_PASSWORD", "password") %>
+
+development:
+  <<: *default
+  database: donna_moneypenny_development
+
+# Warning: The database defined as "test" will be erased and
+# re-generated from your development database when you run "rake".
+# Do not set this db to the same as development or production.
+test:
+  <<: *default
+  database: donna_moneypenny_test
+
+production:
+  primary:
+    <<: *default
+    database: donna_moneypenny_production
+  cache:
+    <<: *default
+    database: donna_moneypenny_production_cache
+    migrations_paths: db/cache_migrate
+  queue:
+    <<: *default
+    database: donna_moneypenny_production_queue
+    migrations_paths: db/queue_migrate
+  cable:
+    <<: *default
+    database: donna_moneypenny_production_cable
+    migrations_paths: db/cable_migrate

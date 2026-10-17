@@ -1,0 +1,19 @@
+<section class="stats-section pie-section">
+  <h2><%= title %></h2>
+
+  <% if slices.empty? %>
+    <p class="muted">Nothing in this period.</p>
+  <% else %>
+    <% parts = pie_slices(slices) %>
+    <%= pie_chart(parts, total: total) %>
+    <ul class="legend">
+      <% parts.each do |part| %>
+        <li>
+          <span class="swatch series-<%= part.color %>"></span>
+          <span class="legend-name"><%= part.name %></span>
+          <span class="legend-value"><%= euros(part.amount) %> <span class="muted"><%= share(part.amount, total) %></span></span>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>

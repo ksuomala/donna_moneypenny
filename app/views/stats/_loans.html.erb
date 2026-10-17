@@ -1,0 +1,43 @@
+<section class="stats-section">
+  <h2>Loans <span class="muted"><%= euros(total) %></span></h2>
+  <p class="loans-summary">Taken <strong><%= euros(taken) %></strong> · Paid <strong><%= euros(paid) %></strong></p>
+
+  <% if rows.empty? %>
+    <p class="muted">No loans.</p>
+  <% else %>
+    <div class="ledger-scroll">
+      <table class="ledger loans">
+        <thead>
+          <tr>
+            <th scope="col">Loan</th>
+            <th scope="col" class="number">Balance</th>
+            <th scope="col" class="number">Change</th>
+            <th scope="col" class="number">Taken</th>
+            <th scope="col" class="number">Paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.each do |row| %>
+            <tr>
+              <th scope="row"><%= row.name %> <span class="muted"><%= row.creditor %><%= " · limit #{euros(row.limit)}" if row.limit %></span></th>
+              <td class="number"><%= row.balance ? euros(row.balance) : tag.span("unknown", class: "muted") %></td>
+              <td class="number"><%= row.change ? signed_euros(row.change) : tag.span("–", class: "muted") %></td>
+              <td class="number"><%= row.taken.zero? ? tag.span("–", class: "muted") : euros(row.taken) %></td>
+              <td class="number"><%= row.paid.zero? ? tag.span("–", class: "muted") : euros(row.paid) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row">Total</th>
+            <td class="number"><%= euros(total) %></td>
+            <td></td>
+            <td class="number"><%= euros(taken) %></td>
+            <td class="number"><%= euros(paid) %></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <p class="muted ledger-note">Balance at the end of the period; taken and paid within it. Credit cards show what's owed and how it changed; their purchases are in the expenses. Loans are left out of income and expenses.</p>
+  <% end %>
+</section>

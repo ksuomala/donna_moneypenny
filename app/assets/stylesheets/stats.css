@@ -1,0 +1,370 @@
+.stats {
+  --surface: #ffffff;
+  --hairline: #e5e7eb;
+  --track: #f3f4f6;
+  --bar: #2a78d6;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --series-other: #9ca3af;
+  --series-uncategorized: #4b5563;
+}
+
+.stats h1 {
+  margin-bottom: 0;
+}
+
+.stats-period {
+  margin-top: 0;
+}
+
+.month-tabs {
+  display: flex;
+  gap: 0.1rem;
+  margin-top: 1rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.month-tab {
+  flex: none;
+  padding: 0.3rem 0.45rem;
+  border-radius: 0.4rem;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.month-tab:hover {
+  background: var(--track);
+}
+
+.month-tab-active {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.month-tab-active:hover {
+  background: #1e40af;
+}
+
+.stats-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+  margin: 1rem 0 1.5rem;
+}
+
+.quick-filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chip {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.chip:hover {
+  background: var(--track);
+}
+
+.chip-active {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.chip-active:hover {
+  background: #1e40af;
+}
+
+.timeline-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.timeline-filter .field {
+  white-space: nowrap;
+}
+
+.timeline-filter input[type="date"] {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+
+.timeline-filter .button {
+  padding: 0.35rem 0.9rem;
+}
+
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 0.5rem;
+}
+
+.stat-tile .muted {
+  font-size: 0.85rem;
+}
+
+.stat-tile strong {
+  font-size: 1.3rem;
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  border-bottom-color: #1d4ed8;
+  font-weight: 600;
+}
+
+.stats-section {
+  margin-top: 1.5rem;
+}
+
+.stats-section h2 {
+  margin-bottom: 0.5rem;
+}
+
+.stats-section h2 .muted {
+  font-weight: normal;
+}
+
+.bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.2rem 0;
+  font-size: 0.9rem;
+}
+
+.bar-row:hover {
+  background: var(--track);
+}
+
+.bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  height: 0.75rem;
+}
+
+.bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  background: var(--bar);
+}
+
+.bar-row-uncategorized .bar {
+  background: var(--series-uncategorized);
+}
+
+.bar-value,
+.legend-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pies {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0 2rem;
+}
+
+.pie {
+  display: block;
+  width: 100%;
+  max-width: 14rem;
+  margin: 0.5rem auto 1rem;
+}
+
+.pie-slice {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.pie-slice:hover {
+  opacity: 0.8;
+}
+
+.pie-total {
+  fill: currentColor;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.legend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.legend li {
+  display: grid;
+  grid-template-columns: 0.75rem 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 3px;
+}
+
+.series-1 { fill: var(--series-1); background: var(--series-1); }
+.series-2 { fill: var(--series-2); background: var(--series-2); }
+.series-3 { fill: var(--series-3); background: var(--series-3); }
+.series-4 { fill: var(--series-4); background: var(--series-4); }
+.series-5 { fill: var(--series-5); background: var(--series-5); }
+.series-6 { fill: var(--series-6); background: var(--series-6); }
+.series-7 { fill: var(--series-7); background: var(--series-7); }
+.series-8 { fill: var(--series-8); background: var(--series-8); }
+.series-other { fill: var(--series-other); background: var(--series-other); }
+.series-uncategorized { fill: var(--series-uncategorized); background: var(--series-uncategorized); }
+
+@media (max-width: 32rem) {
+  .stat-tiles {
+    grid-template-columns: 1fr;
+  }
+
+  .bar-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .bar-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .stats {
+    --surface: #111827;
+    --hairline: #374151;
+    --track: #1f2937;
+    --bar: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --series-other: #6b7280;
+    --series-uncategorized: #d1d5db;
+  }
+}
+
+.ledger-scroll {
+  overflow-x: auto;
+}
+
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.ledger th,
+.ledger td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--hairline);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ledger thead th {
+  font-weight: 600;
+}
+
+.ledger tbody th {
+  font-weight: normal;
+}
+
+.ledger tfoot th,
+.ledger tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+
+.ledger tbody th {
+  min-width: 9rem;
+  white-space: normal;
+}
+
+.ledger tbody th .muted {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.loans-summary {
+  margin: 0 0 0.5rem;
+}
+
+.ledger .number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-note {
+  font-size: 0.85rem;
+}

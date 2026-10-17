@@ -1,0 +1,21 @@
+one:
+  amount: 3000.00
+  description: October paycheck
+  source: salary
+  received_on: 2026-10-01
+  payer: Acme Corp
+  payment_method: direct_deposit
+  notes: Biweekly salary
+  recurring: true
+  currency: USD
+
+two:
+  amount: 450.00
+  description: Logo design project
+  source: freelance
+  received_on: 2026-10-03
+  payer: Jane Doe
+  payment_method: bank_transfer
+  notes: One-off contract
+  recurring: false
+  currency: USD

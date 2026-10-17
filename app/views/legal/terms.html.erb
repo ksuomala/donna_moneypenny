@@ -1,0 +1,37 @@
+<% content_for :title, "Terms of Service · Donna Moneypenny" %>
+
+<main class="legal">
+  <h1>Terms of Service</h1>
+  <p class="legal-updated">Last updated: October 11, 2026</p>
+
+  <h2>The service</h2>
+  <p>
+    Donna Moneypenny is a private, non-commercial personal finance tool, run by its owner for
+    their own use only. It is not offered to the public, there is no way to sign up, and it is
+    free.
+  </p>
+
+  <h2>Bank data</h2>
+  <p>
+    The app reads data from the owner's own bank accounts through Enable Banking Oy, only after
+    the owner has given explicit consent at their bank. Access is read-only: the app cannot make
+    payments or change anything at the bank. Consent can be withdrawn at any time through the
+    bank or Enable Banking, and it also expires automatically.
+  </p>
+  <p>
+    How the data is handled is described in the <%= link_to "Privacy Policy", privacy_path %>.
+  </p>
+
+  <h2>No warranty</h2>
+  <p>
+    The app is provided as is, for personal bookkeeping. Figures shown in it may be incomplete
+    or delayed, and the bank's own records are always authoritative.
+  </p>
+
+  <h2>Changes</h2>
+  <p>
+    These terms may be updated at any time. The date above shows the latest version.
+  </p>
+
+  <p class="legal-footer"><%= link_to "Privacy Policy", privacy_path %></p>
+</main>

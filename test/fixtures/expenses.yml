@@ -1,0 +1,21 @@
+one:
+  amount: 42.50
+  description: Groceries
+  category: food
+  occurred_on: 2026-10-01
+  merchant: Whole Foods
+  payment_method: debit_card
+  notes: Weekly shop
+  recurring: false
+  currency: USD
+
+two:
+  amount: 1200.00
+  description: Rent
+  category: housing
+  occurred_on: 2026-10-01
+  merchant: Landlord
+  payment_method: bank_transfer
+  notes: Monthly rent
+  recurring: true
+  currency: USD

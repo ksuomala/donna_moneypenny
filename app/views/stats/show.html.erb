@@ -1,0 +1,66 @@
+<% content_for :title, "Stats · Donna Moneypenny" %>
+
+<main class="page stats">
+  <nav class="page-nav"><%= link_to "Bank connections", root_path %></nav>
+
+  <h1>Stats</h1>
+  <p class="muted stats-period"><%= stats_period_label(@range) %></p>
+
+  <nav class="month-tabs" aria-label="Months" data-controller="scroll-to-current">
+    <% @months.each do |month| %>
+      <% active = @range == month.all_month %>
+      <%= link_to l(month, format: "%b %y"), stats_path(month: month.strftime("%Y-%m")), class: [ "month-tab", { "month-tab-active": active } ], aria: { current: (active ? "true" : nil) } %>
+    <% end %>
+  </nav>
+
+  <div class="stats-filters">
+    <div class="quick-filters">
+      <% { "week" => "This week", "month" => "This month", "year" => "This year" }.each do |period, label| %>
+        <%= link_to label, stats_path(period: period), class: [ "chip", { "chip-active": @period == period } ], aria: { current: (@period == period ? "true" : nil) } %>
+      <% end %>
+    </div>
+
+    <%= form_with url: stats_path, method: :get, class: "timeline-filter" do |form| %>
+      <span class="field"><%= form.label :from, "From" %> <%= form.date_field :from, value: @range.begin %></span>
+      <span class="field"><%= form.label :to, "To" %> <%= form.date_field :to, value: @range.end %></span>
+      <%= form.submit "Show", name: nil, class: "button" %>
+    <% end %>
+  </div>
+
+  <div class="stat-tiles">
+    <div class="stat-tile">
+      <span class="muted">Income</span>
+      <strong><%= euros(@stats.income_total) %></strong>
+    </div>
+    <div class="stat-tile">
+      <span class="muted">Expenses</span>
+      <strong><%= euros(@stats.expense_total) %></strong>
+    </div>
+    <div class="stat-tile">
+      <span class="muted">Net</span>
+      <strong><%= euros(@stats.net) %></strong>
+    </div>
+  </div>
+
+  <div data-controller="tabs" data-tabs-storage-key-value="stats-chart">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" class="tab" data-tabs-target="tab" data-tab="bar" data-action="tabs#select">Bar chart</button>
+      <button type="button" role="tab" class="tab" data-tabs-target="tab" data-tab="pie" data-action="tabs#select">Pie chart</button>
+    </div>
+
+    <div role="tabpanel" data-tabs-target="panel" data-tab="bar">
+      <%= render "bars", title: "Income", slices: @stats.incomes, total: @stats.income_total %>
+      <%= render "bars", title: "Expenses", slices: @stats.expenses, total: @stats.expense_total %>
+    </div>
+
+    <div role="tabpanel" data-tabs-target="panel" data-tab="pie" hidden>
+      <div class="pies">
+        <%= render "pie", title: "Income", slices: @stats.incomes, total: @stats.income_total %>
+        <%= render "pie", title: "Expenses", slices: @stats.expenses, total: @stats.expense_total %>
+      </div>
+    </div>
+  </div>
+
+  <%= render "accounts", rows: @stats.accounts, total: @stats.account_total %>
+  <%= render "loans", rows: @stats.loans, total: @stats.loan_total, taken: @stats.loans_taken, paid: @stats.loans_paid %>
+</main>

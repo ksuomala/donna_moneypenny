@@ -1,0 +1,44 @@
+<% content_for :title, "Bank connections · Donna Moneypenny" %>
+
+<main class="page">
+  <nav class="page-nav"><%= link_to "Stats", stats_path %></nav>
+
+  <h1>Bank connections</h1>
+
+  <% if notice %><p class="flash flash-notice"><%= notice %></p><% end %>
+  <% if alert %><p class="flash flash-alert"><%= alert %></p><% end %>
+
+  <%= button_to "Connect Nordea", enable_banking_authorization_path, class: "button", data: { turbo: false } %>
+
+  <% if @connections.empty? %>
+    <p class="muted">No banks connected yet.</p>
+  <% end %>
+
+  <% @connections.each do |connection| %>
+    <section class="connection">
+      <h2><%= connection.aspsp_name %> (<%= connection.aspsp_country %>)</h2>
+      <p class="muted">
+        <%= connection.usable? ? "Active" : "Expired" %> ·
+        consent valid until <%= l connection.valid_until.to_date, format: :long %> ·
+        connected <%= l connection.created_at.to_date, format: :long %>
+      </p>
+
+      <% if connection.bank_accounts.any? %>
+        <ul>
+          <% connection.bank_accounts.each do |account| %>
+            <li>
+              <%= account.display_name %>
+              <span class="muted">
+                <%= [ account.iban, account.currency ].compact.join(" · ") %> ·
+                <%= pluralize(account.bank_transactions.size, "transaction") %> ·
+                <%= account.last_synced_at ? "synced #{l account.last_synced_at.in_time_zone("Europe/Helsinki"), format: :short}" : "not synced yet" %>
+              </span>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="muted">No accounts on this connection.</p>
+      <% end %>
+    </section>
+  <% end %>
+</main>

@@ -1,0 +1,84 @@
+require "test_helper"
+require "fugit"
+
+class SyncBankTransactionsJobTest < ActiveJob::TestCase
+  class StubClient
+    def initialize(failing_uids: [])
+      @failing_uids = failing_uids
+    end
+
+    def transactions(account_uid:, date_from:, continuation_key: nil)
+      raise EnableBanking::Client::Error, "rate limited" if @failing_uids.include?(account_uid)
+      raise ActiveRecord::StatementInvalid, "db hiccup" if account_uid == "acc-db-error"
+
+      { "transactions" => [ {
+        "entry_reference" => "ref-#{account_uid}", "status" => "BOOK", "credit_debit_indicator" => "DBIT",
+        "transaction_amount" => { "amount" => "5.00", "currency" => "EUR" }, "booking_date" => "2026-10-01"
+      } ] }
+    end
+
+    def balances(account_uid:)
+      [ { "balance_type" => "CLBD", "balance_amount" => { "amount" => "100.00", "currency" => "EUR" } } ]
+    end
+  end
+
+  setup do
+    @connection = BankConnection.create!(session_id: "s", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now)
+    @first = @connection.bank_accounts.create!(uid: "acc-1")
+    @second = @connection.bank_accounts.create!(uid: "acc-2")
+  end
+
+  def with_client(client)
+    original = EnableBanking::Client.factory
+    EnableBanking::Client.factory = -> { client }
+    yield
+  ensure
+    EnableBanking::Client.factory = original
+  end
+
+  test "syncs every account of active connections" do
+    with_client(StubClient.new) { SyncBankTransactionsJob.perform_now }
+
+    assert_equal 1, @first.bank_transactions.count
+    assert_equal 1, @second.bank_transactions.count
+    assert_equal [ 100, 100 ], [ @first, @second ].map(&:balance)
+  end
+
+  test "one failing account doesn't stop the others, but the job still fails" do
+    error = assert_raises(EnableBanking::Client::Error) do
+      with_client(StubClient.new(failing_uids: [ "acc-1" ])) { SyncBankTransactionsJob.perform_now }
+    end
+
+    assert_match "rate limited", error.message
+    assert_equal 0, @first.bank_transactions.count
+    assert_equal 1, @second.bank_transactions.count
+  end
+
+  test "a non-API error on one account doesn't stop the others" do
+    @first.update!(uid: "acc-db-error")
+
+    error = assert_raises(EnableBanking::Client::Error) do
+      with_client(StubClient.new) { SyncBankTransactionsJob.perform_now }
+    end
+
+    assert_match "db hiccup", error.message
+    assert_equal 1, @second.bank_transactions.count
+  end
+
+  test "expired consent marks the connection expired without calling the bank" do
+    @connection.update!(valid_until: 1.day.ago)
+
+    with_client(StubClient.new(failing_uids: [ "acc-1", "acc-2" ])) { SyncBankTransactionsJob.perform_now }
+
+    assert @connection.reload.expired?
+  end
+
+  test "is scheduled daily at 19:00 Helsinki time in production" do
+    task = YAML.load_file(Rails.root.join("config/recurring.yml")).dig("production", "sync_bank_transactions")
+    schedule = Fugit.parse(task["schedule"])
+
+    assert_equal "SyncBankTransactionsJob", task["class"]
+    assert_equal [ 19, 0 ], schedule.next_time(Time.utc(2026, 1, 15)).to_t.in_time_zone("Europe/Helsinki").then { |t| [ t.hour, t.min ] }
+    assert_equal [ 19, 0 ], schedule.next_time(Time.utc(2026, 7, 15)).to_t.in_time_zone("Europe/Helsinki").then { |t| [ t.hour, t.min ] }
+  end
+end

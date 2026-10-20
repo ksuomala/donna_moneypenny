@@ -44,7 +44,7 @@ has held at least three times, and switch themselves off when you categorise a m
 transaction differently (`bin/rails rules:list`, `rules:upsert`, `rules:toggle`).
 
 Then a background job sends the remaining uncategorised transactions to a model
-(Claude Haiku 4.5 by default; `CATEGORIZER_MODEL` picks Claude, OpenAI `gpt-*` or TypeSafe `jev-*`) in batches, with the category
+(OpenAI GPT-6 Luna by default; `CATEGORIZER_MODEL` picks OpenAI `gpt-*`, Claude `claude-*` or TypeSafe `jev-*`) in batches, with the category
 descriptions, the earlier decisions and every field of each transaction, and gets back a
 decision per transaction in a fixed JSON schema. Code guardrails then turn risky answers into
 unsure ones. Every decision is stored with its reason. Confident ones are written only once

@@ -5,8 +5,8 @@ Rails.application.configure do
   # Reference rules (BankTransactions::Rules) are created, retired and applied after every sync.
   config.x.categorizer.rules = ActiveModel::Type::Boolean.new.cast(ENV.fetch("CATEGORIZER_RULES", "true"))
   config.x.categorizer.apply = ActiveModel::Type::Boolean.new.cast(ENV.fetch("CATEGORIZER_APPLY", "false"))
-  config.x.categorizer.model = ENV.fetch("CATEGORIZER_MODEL", "claude-haiku-4-5")
-  # Ignored on Haiku 4.5, which has no effort setting; used when CATEGORIZER_MODEL is a newer model.
+  config.x.categorizer.model = ENV.fetch("CATEGORIZER_MODEL", "gpt-6-luna")
+  # Reasoning effort for Claude and OpenAI models (Claude Haiku 4.5 and Jev take none).
   config.x.categorizer.effort = ENV.fetch("CATEGORIZER_EFFORT", "medium")
   # Jev (TypeSafe) answers with calibrated confidence; at or above this a choice counts as confident.
   config.x.categorizer.jev_confidence = Float(ENV.fetch("CATEGORIZER_JEV_CONFIDENCE", "0.9"))

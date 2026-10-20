@@ -3,6 +3,11 @@ require_relative "../config/environment"
 require "rails/test_help"
 Dir[File.expand_path("support/**/*.rb", __dir__)].each { |file| require file }
 
+# Tests never reach a model provider: an unstubbed client raises instead of spending tokens.
+[ BankTransactions::Categorizer::AnthropicBackend, BankTransactions::Categorizer::OpenaiBackend, BankTransactions::Categorizer::JevBackend ].each do |backend|
+  backend.client_factory = -> { raise "#{backend.name} called without a stub client in a test" }
+end
+
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers

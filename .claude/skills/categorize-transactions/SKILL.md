@@ -104,6 +104,9 @@ shared with the nightly categorizer: `app/services/bank_transactions/categorizer
 Read it before deciding anything, and follow it the same way the categorizer does. Change it
 there, never here, so the two never drift apart; then run `transactions:categorizer_eval`.
 
+**Never re-categorize.** If an existing category looks wrong, report it to the user instead
+of changing it.
+
 ## When you learn something
 
 When the user answers a question with a rule that will come up again (which tenant rents which

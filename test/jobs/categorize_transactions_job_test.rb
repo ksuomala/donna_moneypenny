@@ -13,6 +13,7 @@ class CategorizeTransactionsJobTest < ActiveJob::TestCase
     @config.max_per_run = 500
     @config.cooldown_days = 7
     @config.apply = false
+    @config.model = "claude-test"
   end
 
   teardown { @saved.each { |key, value| @config.public_send(:"#{key}=", value) } }

@@ -48,7 +48,7 @@ env:
     # first, then the model for the rest. Confident decisions are written to the transactions
     # when CATEGORIZER_APPLY is "true"; unsure ones wait for review (transactions:unsure).
     CATEGORIZER_APPLY: "true"
-    CATEGORIZER_MODEL: jev-latest
+    CATEGORIZER_MODEL: gpt-6-luna
 
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.

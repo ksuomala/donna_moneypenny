@@ -129,8 +129,42 @@ module BankTransactions
 
         verdicts[transaction.id] = verdict(decision, transaction, categories, loan_ids, hints.fetch(transaction.id, []))
       end
+      confirm_large_own_transfers(verdicts, by_id, hints, categories)
 
       transactions.map { |t| verdicts[t.id] || Verdict.new(t.id, nil, nil, "unsure", "no decision", "missing") }
+    end
+
+    PAIR_PENDING = "large own transfer, other side unconfirmed"
+
+    # A large Own transfer has no name precedent when it comes without a counterparty (rows on a
+    # credit card account never have one). Its other side is the evidence instead. It stays
+    # confident when every candidate other side is booked and either already Own or, in this
+    # batch, a confident Own decision itself. Repeats until nothing changes, because a
+    # downgraded other side takes its partner's backing with it.
+    def confirm_large_own_transfers(verdicts, by_id, hints, categories)
+      own_id = categories.values.find { |c| c.name == "Own" }&.id
+      waiting = verdicts.values.select { |v| v.guard == PAIR_PENDING }
+      waiting.each { |v| verdicts[v.transaction_id] = v.with(confidence: "confident", guard: nil) }
+
+      loop do
+        changed = false
+        waiting.each do |v|
+          next unless verdicts[v.transaction_id].confident?
+
+          others = hints.fetch(v.transaction_id, [])
+          backed = others.any? && others.all? do |other|
+            next false unless other.booked?
+
+            decided = verdicts[other.id] if by_id.key?(other.id)
+            decided ? decided.confident? && decided.category_id == own_id : !@excluding.include?(other.id) && other.transaction_category_id == own_id
+          end
+          next if backed
+
+          verdicts[v.transaction_id] = verdicts[v.transaction_id].with(confidence: "unsure", guard: "large amount without precedent")
+          changed = true
+        end
+        break unless changed
+      end
     end
 
     def verdict(decision, transaction, categories, loan_ids, others)
@@ -147,7 +181,8 @@ module BankTransactions
         if category.nil?
           confidence, guard = "unsure", "confident without category"
         elsif transaction.amount.abs > LARGE_AMOUNT && !@precedents.include?([ transaction.counterparty_name, transaction.bank_account_id, category.id ])
-          confidence, guard = "unsure", "large amount without precedent"
+          # An Own transfer can be backed by its other side instead (confirm_large_own_transfers).
+          confidence, guard = "unsure", category.name == "Own" && others.any? ? PAIR_PENDING : "large amount without precedent"
         elsif category.name == "Own" && others.empty? && transaction.raw&.dig("bank_transaction_code", "description") != "Oma siirto"
           confidence, guard = "unsure", "own transfer without other side"
         end

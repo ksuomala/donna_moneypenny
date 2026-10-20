@@ -116,6 +116,42 @@ class BankTransactions::CategorizerTest < ActiveSupport::TestCase
     assert_equal [ @loans.id, nil, "confident" ], verdicts[ghost_loan.id].then { |v| [ v.category_id, v.loan_id, v.confidence ] }
   end
 
+  test "a large Own transfer is backed by its other side: booked, unambiguous, and Own already or confidently Own in the batch" do
+    paid = transaction(@account, "p1", counterparty: "Card Issuer", amount: -3000, transaction_category: @own)
+    payment = transaction(@card, "c1", counterparty: nil, amount: 3000, bank_code: "Suoritus")
+    out = transaction(@card, "c2", counterparty: nil, amount: -6500, bank_code: "Tilisiirto", occurred_on: Date.new(2026, 10, 2))
+    into = transaction(@account, "p2", counterparty: "Me", amount: 6500, bank_code: "Oma siirto", occurred_on: Date.new(2026, 10, 2))
+    waiting = transaction(@card, "c3", counterparty: nil, amount: 2000, bank_code: "Suoritus", occurred_on: Date.new(2026, 10, 3))
+    transaction(@account, "p3", counterparty: "Card Issuer", amount: -2000, status: "pending", occurred_on: Date.new(2026, 10, 3))
+    twice = transaction(@card, "c4", counterparty: nil, amount: 1500, bank_code: "Suoritus", occurred_on: Date.new(2026, 10, 4))
+    transaction(@account, "p4", counterparty: "Card Issuer", amount: -1500, transaction_category: @own, occurred_on: Date.new(2026, 10, 4))
+    transaction(@rental, "p5", counterparty: "Card Issuer", amount: -1500, transaction_category: @groceries, occurred_on: Date.new(2026, 10, 4))
+    big_shop = transaction(@account, "s1", counterparty: "Big Shop", amount: -2500)
+    client = StubClient.new(decisions: [ payment, out, into, waiting, twice ].map { |t| decision(t, @own) } + [ decision(big_shop, @groceries) ])
+
+    verdicts = categorize([ payment, out, into, waiting, twice, big_shop ], client: client).verdicts.index_by(&:transaction_id)
+
+    assert_equal [ "confident", nil ], verdicts[payment.id].to_h.values_at(:confidence, :guard), "other side already Own"
+    assert_equal [ "confident", nil ], verdicts[out.id].to_h.values_at(:confidence, :guard), "both halves in the batch, both Own"
+    assert_equal [ "confident", nil ], verdicts[into.id].to_h.values_at(:confidence, :guard)
+    assert_equal [ "unsure", "large amount without precedent" ], verdicts[waiting.id].to_h.values_at(:confidence, :guard), "other side pending"
+    assert_equal [ "unsure", "large amount without precedent" ], verdicts[twice.id].to_h.values_at(:confidence, :guard), "two candidates, one not Own"
+    assert_equal [ "unsure", "large amount without precedent" ], verdicts[big_shop.id].to_h.values_at(:confidence, :guard), "not Own: name precedent still required"
+    assert_equal @own, paid.reload.transaction_category
+  end
+
+  test "a large Own transfer loses its backing when its partner in the batch is downgraded" do
+    out = transaction(@card, "c1", counterparty: nil, amount: -6500, bank_code: "Tilisiirto")
+    into = transaction(@account, "p1", counterparty: "Me", amount: 6500, bank_code: "Oma siirto")
+    transaction(@rental, "p2", counterparty: "Me", amount: 6500, status: "pending")
+    client = StubClient.new(decisions: [ decision(out, @own), decision(into, @own) ])
+
+    verdicts = categorize([ out, into ], client: client).verdicts.index_by(&:transaction_id)
+
+    assert_equal "unsure", verdicts[out.id].confidence, "its candidates include a pending row"
+    assert_equal "unsure", verdicts[into.id].confidence, "its only other side was downgraded"
+  end
+
   test "an unsure decision keeps its guess, decisions outside the batch are dropped, duplicates keep the first, left-out rows become unsure" do
     guessed = transaction(@account, "a")
     repeated = transaction(@account, "b")

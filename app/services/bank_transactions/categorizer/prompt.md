@@ -51,6 +51,9 @@ category silently skews every report. When in doubt, say unsure.
   candidates. Both sides are Own, for the whole amount. A payment with no other side is not
   proven to be Own: unsure, unless the bank code is `Oma siirto` or the description says so.
   The other side is often still pending and is then listed as pending.
+- Money moved from a credit card to one of the owner's accounts (bank code `Tilisiirto` on the
+  card account) is an own transfer too: Own on both sides when the other side is listed. Rows on
+  a card account have no counterparty and no message; the other side is what identifies them.
 - Interest and fees on a credit card are never part of the card payment. They come as separate
   rows on the card account and go to Loans, with no loan.
 - Transfers between the owner's accounts at the same bank (`Oma siirto`) are Own. Deposits from

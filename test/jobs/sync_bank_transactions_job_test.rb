@@ -65,6 +65,20 @@ class SyncBankTransactionsJobTest < ActiveJob::TestCase
     assert_equal 1, @second.bank_transactions.count
   end
 
+  test "rules categorize after the sync, before the categorizer" do
+    own = TransactionCategory.create!(name: "Own", exclude_from_stats: true)
+    CategorizationRule.create!(reference: "ref-acc-1", transaction_category: own)
+    client = StubClient.new
+    client.define_singleton_method(:transactions) do |account_uid:, **params|
+      super(account_uid: account_uid, **params).tap { |page| page["transactions"].each { |t| t["reference_number"] = "ref-#{account_uid}" } }
+    end
+
+    with_client(client) { SyncBankTransactionsJob.perform_now }
+
+    assert_equal own, @first.bank_transactions.sole.transaction_category
+    assert_nil @second.bank_transactions.sole.transaction_category
+  end
+
   test "the categorizer follows the sync, also when an account failed" do
     assert_enqueued_with(job: CategorizeTransactionsJob) do
       assert_raises(EnableBanking::Client::Error) do

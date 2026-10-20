@@ -42,11 +42,13 @@ class CategorizeTransactionsJob < ApplicationJob
 
   def config = Rails.configuration.x.categorizer
 
-  # A new run over the oldest uncategorized booked transactions, leaving out the ones decided
-  # recently under the same rules (a changed category description lifts the cooldown).
+  # A new run over the oldest uncategorized booked transactions, leaving out the ones the same
+  # model decided recently under the same rules (a changed category description or another
+  # model lifts the cooldown).
   def start(limit:)
     cooled = CategorizationDecision.joins(:run).where(created_at: config.cooldown_days.days.ago..)
-      .merge(CategorizationRun.where(rules_digest: BankTransactions::Categorizer.rules_digest, mode: [ :shadow, :apply ])).select(:bank_transaction_id)
+      .merge(CategorizationRun.where(rules_digest: BankTransactions::Categorizer.rules_digest, model: config.model, mode: [ :shadow, :apply ]))
+      .select(:bank_transaction_id)
     ids = BankTransaction.booked.where(transaction_category_id: nil).where.not(id: cooled).order(:occurred_on, :id).limit(limit || config.max_per_run).pluck(:id)
     run = CategorizationRun.create!(mode: config.apply ? :apply : :shadow, model: config.model, prompt_version: BankTransactions::Categorizer.prompt_version,
                                     rules_digest: BankTransactions::Categorizer.rules_digest, started_at: Time.current,

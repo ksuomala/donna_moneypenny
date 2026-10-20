@@ -44,9 +44,11 @@ env:
     DB_HOST: donna_moneypenny-db
     DB_USERNAME: root
 
-    # The nightly categorizer (config/initializers/categorizer.rb) stores its decisions but
-    # doesn't write them to the transactions until this is "true".
-    CATEGORIZER_APPLY: "false"
+    # The nightly categorizer (config/initializers/categorizer.rb): reference and amount rules
+    # first, then the model for the rest. Confident decisions are written to the transactions
+    # when CATEGORIZER_APPLY is "true"; unsure ones wait for review (transactions:unsure).
+    CATEGORIZER_APPLY: "true"
+    CATEGORIZER_MODEL: jev-latest
 
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.

@@ -3,6 +3,8 @@ class BankTransaction < ApplicationRecord
   belongs_to :transaction_category, optional: true
   belongs_to :loan, optional: true
   has_many :categorization_decisions, dependent: :delete_all
+  # The rule that set the category, if one did (BankTransactions::Rules).
+  belongs_to :categorization_rule, optional: true
 
   enum :status, { booked: 0, pending: 1 }
 

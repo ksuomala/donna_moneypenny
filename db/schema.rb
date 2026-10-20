@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -73,9 +73,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
     t.datetime "updated_at", null: false
     t.bigint "transaction_category_id"
     t.bigint "loan_id"
+    t.bigint "categorization_rule_id"
     t.index ["bank_account_id", "entry_reference"], name: "index_bank_transactions_on_bank_account_id_and_entry_reference", unique: true
     t.index ["bank_account_id", "occurred_on"], name: "index_bank_transactions_on_bank_account_id_and_occurred_on"
     t.index ["bank_account_id"], name: "index_bank_transactions_on_bank_account_id"
+    t.index ["categorization_rule_id"], name: "index_bank_transactions_on_categorization_rule_id"
     t.index ["loan_id"], name: "index_bank_transactions_on_loan_id"
     t.index ["transaction_category_id"], name: "index_bank_transactions_on_transaction_category_id"
   end
@@ -95,6 +97,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
     t.index ["categorization_run_id"], name: "index_categorization_decisions_on_categorization_run_id"
     t.index ["loan_id"], name: "index_categorization_decisions_on_loan_id"
     t.index ["transaction_category_id"], name: "index_categorization_decisions_on_transaction_category_id"
+  end
+
+  create_table "categorization_rules", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "transaction_category_id", null: false
+    t.bigint "loan_id"
+    t.string "reference"
+    t.string "reference_prefix"
+    t.bigint "bank_account_id"
+    t.string "counterparty"
+    t.decimal "amount", precision: 12, scale: 2
+    t.integer "direction"
+    t.integer "source", default: 0, null: false
+    t.boolean "active", default: true, null: false
+    t.string "disabled_reason"
+    t.string "note"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bank_account_id"], name: "index_categorization_rules_on_bank_account_id"
+    t.index ["counterparty", "amount"], name: "index_categorization_rules_on_counterparty_and_amount"
+    t.index ["loan_id"], name: "index_categorization_rules_on_loan_id"
+    t.index ["reference"], name: "index_categorization_rules_on_reference"
+    t.index ["reference_prefix"], name: "index_categorization_rules_on_reference_prefix"
+    t.index ["transaction_category_id"], name: "index_categorization_rules_on_transaction_category_id"
   end
 
   create_table "categorization_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -186,12 +211,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
   add_foreign_key "bank_account_balances", "bank_accounts"
   add_foreign_key "bank_accounts", "bank_connections"
   add_foreign_key "bank_transactions", "bank_accounts"
+  add_foreign_key "bank_transactions", "categorization_rules", on_delete: :nullify
   add_foreign_key "bank_transactions", "loans"
   add_foreign_key "bank_transactions", "transaction_categories", on_delete: :nullify
   add_foreign_key "categorization_decisions", "bank_transactions", on_delete: :cascade
   add_foreign_key "categorization_decisions", "categorization_runs"
   add_foreign_key "categorization_decisions", "loans", on_delete: :nullify
   add_foreign_key "categorization_decisions", "transaction_categories", on_delete: :nullify
+  add_foreign_key "categorization_rules", "bank_accounts"
+  add_foreign_key "categorization_rules", "loans"
+  add_foreign_key "categorization_rules", "transaction_categories"
   add_foreign_key "loan_balances", "loans"
   add_foreign_key "transaction_categories", "transaction_categories", column: "parent_id"
 end

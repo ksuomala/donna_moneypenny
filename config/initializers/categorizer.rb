@@ -2,6 +2,8 @@
 # in shadow mode: decisions are stored but not written to the transactions until
 # CATEGORIZER_APPLY is set. Set the variables in config/deploy.yml (env.clear).
 Rails.application.configure do
+  # Reference rules (BankTransactions::Rules) are created, retired and applied after every sync.
+  config.x.categorizer.rules = ActiveModel::Type::Boolean.new.cast(ENV.fetch("CATEGORIZER_RULES", "true"))
   config.x.categorizer.apply = ActiveModel::Type::Boolean.new.cast(ENV.fetch("CATEGORIZER_APPLY", "false"))
   config.x.categorizer.model = ENV.fetch("CATEGORIZER_MODEL", "claude-haiku-4-5")
   # Ignored on Haiku 4.5, which has no effort setting; used when CATEGORIZER_MODEL is a newer model.

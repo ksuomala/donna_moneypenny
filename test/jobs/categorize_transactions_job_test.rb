@@ -90,7 +90,11 @@ class CategorizeTransactionsJobTest < ActiveJob::TestCase
       run_all(stub)
       assert_equal 1, CategorizationRun.order(:id).last.transactions_count
     end
-    assert_equal 3, row.categorization_decisions.count
+
+    @config.model = "claude-other"
+    run_all(stub)
+    assert_equal 1, CategorizationRun.order(:id).last.transactions_count
+    assert_equal 4, row.categorization_decisions.count
   end
 
   test "the cap limits a run" do

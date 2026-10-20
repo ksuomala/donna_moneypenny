@@ -49,7 +49,8 @@ stays the same once they're booked.
       sub-categories; transactions go on leaf categories only. Generic defaults in `db/seeds.rb`, own categories via `categories:import`
 - [x] Categorize transactions automatically (Claude), using the category descriptions as instructions
       (`CategorizeTransactionsJob` after the sync, shadow mode by default, `transactions:categorizer_eval`)
-- [ ] Add the Anthropic API key to the credentials, run the eval in production, then set `CATEGORIZER_APPLY: "true"`
+- [x] Compare models on the same sample (`categorizer_eval MODEL= SEED=`): Jev chosen, apply mode on
+- [x] Reference and amount rules before the model (`CategorizationRule`, derived from history, retired on conflict)
 
 ## Stats
 

@@ -2,6 +2,7 @@ class TransactionCategory < ApplicationRecord
   belongs_to :parent, class_name: "TransactionCategory", optional: true
   has_many :children, class_name: "TransactionCategory", foreign_key: :parent_id, dependent: :restrict_with_error
   has_many :bank_transactions, dependent: :nullify
+  has_many :categorization_rules, dependent: :restrict_with_error
 
   # Investments (e.g. rental properties) are tracked per sub-category: positive amounts are
   # revenue, negative ones costs. Categories excluded from stats (own transfers, credit card

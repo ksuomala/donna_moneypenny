@@ -38,8 +38,13 @@ workflow end to end.
 
 ## Automatic categorisation
 
-After every nightly sync a background job sends the uncategorised transactions to Claude
-(Haiku 4.5 by default, `CATEGORIZER_MODEL` to change it) in batches, with the category
+After every nightly sync, rules go first. A rule matches a reference, a reference prefix, or the
+same amount to the same counterparty; rules are derived from your own history once a pattern
+has held at least three times, and switch themselves off when you categorise a matching
+transaction differently (`bin/rails rules:list`, `rules:upsert`, `rules:toggle`).
+
+Then a background job sends the remaining uncategorised transactions to a model
+(Claude Haiku 4.5 by default; `CATEGORIZER_MODEL` picks Claude, OpenAI `gpt-*` or TypeSafe `jev-*`) in batches, with the category
 descriptions, the earlier decisions and every field of each transaction, and gets back a
 decision per transaction in a fixed JSON schema. Code guardrails then turn risky answers into
 unsure ones. Every decision is stored with its reason. Confident ones are written only once

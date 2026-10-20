@@ -9,7 +9,10 @@ Assign a `TransactionCategory` to each uncategorized booked `BankTransaction`, s
 reports are right. Precision matters more than coverage: a transaction left uncategorized is
 harmless, one in the wrong category silently skews every report.
 
-The app categorizes by itself every night after the sync (`CategorizeTransactionsJob`, with
+Rules come first: references, reference prefixes and the same amount to the same counterparty
+(`CategorizationRule`), created from the history when they have been used consistently at least
+three times, and switched off automatically as soon as a categorization contradicts them. Then the
+app categorizes the rest by itself every night after the sync (`CategorizeTransactionsJob`, with
 Claude through the API). Every decision is stored. Until `CATEGORIZER_APPLY` is switched on it
 only stores them (shadow mode); after that it writes the confident ones and keeps the unsure ones
 with a best guess. This skill handles what the categorizer was unsure about, and keeps the rules
@@ -31,6 +34,12 @@ bin/kamal app exec --reuse 'bin/rails transactions:categorizer_runs'
 # Test the categorizer on already categorized transactions (writes nothing; costs API tokens).
 # Run it after changing descriptions, before trusting the change.
 bin/kamal app exec --reuse 'bin/rails transactions:categorizer_eval SAMPLE=200'
+
+# Rules: every rule with its matches and conflicts; a manual rule (e.g. a loan's installment
+# reference prefix); switch one off or on
+bin/kamal app exec --reuse 'bin/rails rules:list'
+bin/kamal app exec --reuse 'bin/rails rules:upsert CATEGORY="Loans" LOAN="Mortgage" PREFIX="12345678"'
+bin/kamal app exec --reuse 'bin/rails rules:toggle ID=3'
 
 # Read-only: categories with their descriptions, accounts, and earlier decisions per counterparty
 bin/kamal app exec --reuse 'bin/rails transactions:categorization_context'

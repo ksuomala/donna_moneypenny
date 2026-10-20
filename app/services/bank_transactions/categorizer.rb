@@ -1,6 +1,7 @@
 module BankTransactions
-  # Decides the categories of a batch of uncategorized transactions with Claude, in one Messages
-  # API request with a structured (JSON schema) answer. The model gets the same context the
+  # Decides the categories of a batch of uncategorized transactions with a model (Claude by
+  # default; OpenAI and TypeSafe's Jev through the backends in categorizer/), in one request
+  # with a structured answer. The model gets the same context the
   # categorize-transactions skill reads (categories with their descriptions, loans, accounts,
   # earlier decisions per counterparty), the batch with every field, and for each transaction
   # the rows that could be the other side of a transfer.
@@ -17,10 +18,11 @@ module BankTransactions
     # The model declined the batch.
     Refused = Class.new(Error)
 
+    # Rate limited by a provider without an SDK error of its own (OpenAI, TypeSafe).
+    RateLimited = Class.new(Error)
+
     PROMPT_PATH = Rails.root.join("app/services/bank_transactions/categorizer/prompt.md")
-    MAX_TOKENS = 16_000
     LARGE_AMOUNT = 1000
-    REQUEST_OPTIONS = { timeout: 600, max_retries: 3 }.freeze
 
     # The JSON schema the model's answer is constrained to.
     class Decision < Anthropic::BaseModel
@@ -42,17 +44,21 @@ module BankTransactions
     end
     Usage = Data.define(:input_tokens, :output_tokens, :cache_read_input_tokens, :cache_creation_input_tokens)
     Result = Data.define(:verdicts, :usage, :model)
+    # What a backend returns: decisions shaped like Decision, usage, and the model that answered.
+    Response = Data.define(:decisions, :usage, :model)
 
-    # Tests swap the factory for one returning a stub; the real client needs an API key when
-    # it's built, so it's only built when a categorizer is.
-    DEFAULT_CLIENT_FACTORY = -> { Anthropic::Client.new(api_key: BankTransactions::Categorizer.api_key) }
-    class_attribute :client_factory, default: DEFAULT_CLIENT_FACTORY
+    # The provider is picked by the model ID: gpt-* and o* go to OpenAI, jev* to TypeSafe, the
+    # rest to Anthropic.
+    def self.backend_for(model)
+      case model.to_s
+      when /\A(gpt-|o\d)/ then OpenaiBackend
+      when /\Ajev/ then JevBackend
+      else AnthropicBackend
+      end
+    end
 
-    def self.api_key = Rails.application.credentials.dig(:anthropic, :api_key).presence || ENV["ANTHROPIC_API_KEY"].presence
-
-    # Whether a client can be built: false until an API key is in the credentials or the env.
-    # Tests that stub the client set the factory, which counts as configured.
-    def self.configured? = client_factory != DEFAULT_CLIENT_FACTORY || api_key.present?
+    # Whether the model's provider has an API key.
+    def self.configured?(model = Rails.configuration.x.categorizer.model) = backend_for(model).configured?
 
     def self.prompt = File.read(PROMPT_PATH)
 
@@ -66,12 +72,11 @@ module BankTransactions
 
     # excluding: transaction ids to hide from the context (the evaluation sends categorized
     # transactions as if they were new, and their own decisions must not be visible).
-    def initialize(excluding: [], model: Rails.configuration.x.categorizer.model, effort: Rails.configuration.x.categorizer.effort,
-                   client: self.class.client_factory.call)
+    # client: a stand-in for the provider's client, in tests.
+    def initialize(excluding: [], model: Rails.configuration.x.categorizer.model, effort: Rails.configuration.x.categorizer.effort, client: nil)
       @excluding = excluding
       @model = model
-      @effort = effort
-      @client = client
+      @backend = self.class.backend_for(model).new(model: model, effort: effort, client: client)
       @context = Categorization.context(excluding: excluding)
       @precedents = Categorization.known_decisions(excluding: excluding).map { |name, account_id, category_id, _| [ name, account_id, category_id ] }.to_set
     end
@@ -82,25 +87,12 @@ module BankTransactions
     def call(transactions)
       transactions = transactions.to_a
       hints = Categorization.pairing_hints(transactions, hide: @excluding)
+      categories = TransactionCategory.includes(:children, :parent).reject { |c| c.children.any? }
 
-      message = @client.messages.create(
-        model: @model,
-        max_tokens: MAX_TOKENS,
-        system_: [
-          { type: "text", text: self.class.prompt, cache_control: { type: "ephemeral" } },
-          { type: "text", text: @context, cache_control: { type: "ephemeral" } }
-        ],
-        messages: [ { role: "user", content: user_message(transactions, hints) } ],
-        output_config: output_config,
-        request_options: REQUEST_OPTIONS
-      )
+      response = @backend.decide(prompt: self.class.prompt, context: @context, user_message: user_message(transactions, hints),
+                                 transactions: transactions, categories: categories, loans: Loan.order(:id).to_a)
 
-      raise Truncated, "Answer for #{transactions.size} transactions hit #{MAX_TOKENS} tokens" if message.stop_reason == :max_tokens
-      raise Refused, "Model refused the batch" if message.stop_reason == :refusal
-      parsed = message.parsed_output
-      raise Error, "Unusable answer: #{parsed.inspect.first(200)}" unless parsed.is_a?(Decisions)
-
-      Result.new(verdicts: verdicts(parsed.decisions, transactions, hints), usage: usage(message.usage), model: message.model.to_s)
+      Result.new(verdicts: verdicts(response.decisions, transactions, hints), usage: response.usage, model: response.model.presence || @model.to_s)
     end
 
     # The batch and, for each transaction, the candidate other sides of a transfer.
@@ -119,11 +111,6 @@ module BankTransactions
         end
       end
       lines.join("\n")
-    end
-
-    # Haiku 4.5 has no effort setting (the API rejects it), the newer models take one.
-    def output_config
-      @effort.present? && !@model.to_s.start_with?("claude-haiku-4") ? { effort: @effort, format: Decisions } : { format: Decisions }
     end
 
     private
@@ -168,11 +155,6 @@ module BankTransactions
       loan_id = decision.loan_id if category&.name == "Loans" && loan_ids.include?(decision.loan_id)
 
       Verdict.new(transaction.id, category&.id, loan_id, confidence, reason, guard)
-    end
-
-    def usage(usage)
-      Usage.new(input_tokens: usage.input_tokens.to_i, output_tokens: usage.output_tokens.to_i,
-                cache_read_input_tokens: usage.cache_read_input_tokens.to_i, cache_creation_input_tokens: usage.cache_creation_input_tokens.to_i)
     end
   end
 end

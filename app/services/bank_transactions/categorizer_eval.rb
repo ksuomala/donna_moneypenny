@@ -10,7 +10,9 @@ module BankTransactions
       def correct? = verdict.category_id == transaction.transaction_category_id
     end
 
-    def initialize(sample:, since: nil, batch_size: Rails.configuration.x.categorizer.batch_size, model: Rails.configuration.x.categorizer.model)
+    # seed: the same seed picks the same sample, so models can be compared on identical transactions.
+    def initialize(sample:, since: nil, batch_size: Rails.configuration.x.categorizer.batch_size, model: Rails.configuration.x.categorizer.model, seed: nil)
+      @seed = seed
       @sample = sample
       @since = since
       @batch_size = batch_size
@@ -22,7 +24,8 @@ module BankTransactions
     def call
       scope = BankTransaction.booked.where.not(transaction_category_id: nil)
       scope = scope.where(occurred_on: @since..) if @since
-      transactions = scope.order(Arel.sql("RAND()")).limit(@sample).to_a
+      order = @seed ? Arel.sql("RAND(#{Integer(@seed)})") : Arel.sql("RAND()")
+      transactions = scope.order(order).limit(@sample).to_a
       ids = transactions.map(&:id)
 
       categorizer = Categorizer.new(excluding: ids, model: @model)
@@ -49,7 +52,7 @@ module BankTransactions
 
     def report
       names = TransactionCategory.pluck(:id, :name).to_h
-      lines = [ "# eval run #{run.id} with #{run.model}: #{rows.size} categorized transactions sent as new, cost ~#{run.cost&.round(3)} USD" ]
+      lines = [ "# eval run #{run.id} with #{run.model}#{" (seed #{@seed})" if @seed}: #{rows.size} categorized transactions sent as new, cost ~#{run.cost&.round(3)} USD" ]
       lines << "# group, transactions, confident, confident correct, confident precision, unsure guesses correct"
       { "all" => rows, "with precedent" => rows.select(&:precedent), "without precedent" => rows.reject(&:precedent) }.each do |label, group|
         confident = group.select { |r| r.verdict.confident? }

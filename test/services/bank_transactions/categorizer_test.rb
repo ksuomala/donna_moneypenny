@@ -189,4 +189,93 @@ class BankTransactions::CategorizerTest < ActiveSupport::TestCase
     assert_not_equal digest, BankTransactions::Categorizer.rules_digest
     assert_equal version, BankTransactions::Categorizer.prompt_version
   end
+
+  # Answers OpenAI and TypeSafe requests with a canned JSON body and records the bodies.
+  class JsonStub
+    attr_reader :bodies
+
+    def initialize(&answer)
+      @answer = answer
+      @bodies = []
+    end
+
+    def post(body)
+      @bodies << body
+      JSON.parse(@answer.call(body).to_json)
+    end
+  end
+
+  test "the model ID picks the provider" do
+    assert_equal BankTransactions::Categorizer::AnthropicBackend, BankTransactions::Categorizer.backend_for("claude-haiku-4-5")
+    assert_equal BankTransactions::Categorizer::OpenaiBackend, BankTransactions::Categorizer.backend_for("gpt-6-luna")
+    assert_equal BankTransactions::Categorizer::JevBackend, BankTransactions::Categorizer.backend_for("jev-latest")
+  end
+
+  test "OpenAI gets the prompt, context and batch with a strict schema, and its answer goes through the guardrails" do
+    shop = transaction(@account, "a")
+    big = transaction(@account, "b", counterparty: "Big Shop", amount: -1500)
+    client = JsonStub.new do |_|
+      { status: "completed", model: "gpt-6-luna",
+        output: [ { type: "reasoning" }, { type: "message", content: [ { type: "output_text", text: {
+          decisions: [ decision(shop, @groceries), decision(big, @groceries) ] }.to_json } ] } ],
+        usage: { input_tokens: 5000, input_tokens_details: { cached_tokens: 4000 }, output_tokens: 300 } }
+    end
+
+    result = categorize([ shop, big ], client: client, model: "gpt-6-luna", effort: "low")
+
+    body = client.bodies.sole
+    assert_equal "gpt-6-luna", body[:model]
+    assert_includes body[:instructions], "# Signals, strongest first"
+    assert_includes body[:instructions], "# categories: id, name, kind, parent, description"
+    assert_includes body[:input].sole[:content], "#{shop.id}\t#{@account.id}\t2026-10-01"
+    assert_equal({ effort: "low" }, body[:reasoning])
+    format = body[:text][:format]
+    assert_equal [ "json_schema", true ], [ format[:type], format[:strict] ]
+    assert_equal %w[integer null], format[:schema].dig(:properties, :decisions, :items, :properties, :category_id, :type)
+    assert_equal [ "confident", "unsure" ], result.verdicts.map(&:confidence)
+    assert_equal "large amount without precedent", result.verdicts.second.guard
+    assert_equal [ 1000, 300, 4000, 0 ], result.usage.to_h.values
+    assert_equal "gpt-6-luna", result.model
+  end
+
+  test "OpenAI's incomplete or refused answers raise" do
+    row = transaction(@account, "a")
+    cut = JsonStub.new { |_| { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } } }
+    refused = JsonStub.new { |_| { status: "completed", output: [ { type: "message", content: [ { type: "refusal", refusal: "no" } ] } ] } }
+
+    assert_raises(BankTransactions::Categorizer::Truncated) { categorize([ row ], client: cut, model: "gpt-6-luna") }
+    assert_raises(BankTransactions::Categorizer::Refused) { categorize([ row ], client: refused, model: "gpt-6-luna") }
+  end
+
+  test "Jev gets one category and one loan question per transaction; confidence above the threshold is confident" do
+    shop = transaction(@account, "a")
+    loan = transaction(@account, "b", counterparty: "Bank", amount: -400)
+    client = JsonStub.new do |body|
+      { model: "jev-1.14.0", usage: { input_tokens: 9000, output_tokens: 40 },
+        answers: {
+          "t#{shop.id}" => { type: "choice", choice: "c#{@groceries.id}", confidence: 0.95, probabilities: { "c#{@groceries.id}" => 0.97, "c#{@own.id}" => 0.02 } },
+          "l#{shop.id}" => { type: "choice", choice: "none", confidence: 0.99, probabilities: {} },
+          "t#{loan.id}" => { type: "choice", choice: "c#{@loans.id}", confidence: 0.6, probabilities: { "c#{@loans.id}" => 0.7 } },
+          "l#{loan.id}" => { type: "choice", choice: "l#{@mortgage.id}", confidence: 0.8, probabilities: {} }
+        } }
+    end
+
+    result = BankTransactions::Categorizer.new(client: client, model: "jev-latest").call([ shop, loan ])
+
+    body = client.bodies.sole
+    assert_equal "jev-latest", body[:model]
+    assert_includes body[:state], "# categories: id, name, kind, parent, description"
+    assert_includes body[:state], "#{shop.id}\t#{@account.id}\t2026-10-01"
+    assert_equal %W[t#{shop.id} l#{shop.id} t#{loan.id} l#{loan.id}], body[:questions].keys
+    criteria = body[:questions]["t#{shop.id}"][:criteria]
+    assert_equal "Groceries", criteria["c#{@groceries.id}"]
+    assert_equal "Investment / Apartment A", criteria["c#{@apartment.id}"]
+    assert_not criteria.key?("c#{@investment.id}")
+    assert_equal [ "Mortgage", "none" ], body[:questions]["l#{shop.id}"][:criteria].then { |c| [ c["l#{@mortgage.id}"], c.keys.last ] }
+
+    shop_verdict, loan_verdict = result.verdicts
+    assert_equal [ @groceries.id, nil, "confident", "confidence 0.95; Groceries 0.97, Own 0.02" ], shop_verdict.to_h.values_at(:category_id, :loan_id, :confidence, :reason)
+    assert_equal [ @loans.id, @mortgage.id, "unsure" ], loan_verdict.to_h.values_at(:category_id, :loan_id, :confidence)
+    assert_equal [ 9000, 40, 0, 0 ], result.usage.to_h.values
+  end
 end

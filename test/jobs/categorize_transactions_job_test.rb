@@ -131,7 +131,7 @@ class CategorizeTransactionsJobTest < ActiveJob::TestCase
   test "does nothing without an API key" do
     transaction("a")
 
-    perform_enqueued_jobs { CategorizeTransactionsJob.perform_later } unless BankTransactions::Categorizer.api_key
+    perform_enqueued_jobs { CategorizeTransactionsJob.perform_later } unless BankTransactions::Categorizer::AnthropicBackend.api_key
 
     assert_empty CategorizationRun.all
   end

@@ -28,10 +28,11 @@ class CategorizerStub
   end
 
   def self.with(client)
-    original = BankTransactions::Categorizer.client_factory
-    BankTransactions::Categorizer.client_factory = -> { client }
+    backend = BankTransactions::Categorizer::AnthropicBackend
+    original = backend.client_factory
+    backend.client_factory = -> { client }
     yield
   ensure
-    BankTransactions::Categorizer.client_factory = original
+    backend.client_factory = original
   end
 end

@@ -30,7 +30,7 @@ class CategorizeTransactionsJob < ApplicationJob
 
     self.class.perform_later(run_id: run.id, ids: batch + rest, batch_size: [ batch_size / 2, 1 ].max)
     Rails.logger.warn("[categorizer] run #{run.id}: #{e.message}, retrying with batches of #{[ batch_size / 2, 1 ].max}")
-  rescue Anthropic::Errors::RateLimitError => e
+  rescue Anthropic::Errors::RateLimitError, BankTransactions::Categorizer::RateLimited => e
     self.class.set(wait: RATE_LIMIT_WAIT).perform_later(run_id: run.id, ids: batch + rest, batch_size: batch_size)
     Rails.logger.warn("[categorizer] run #{run.id}: rate limited (#{e.message}), continuing in #{RATE_LIMIT_WAIT.inspect}")
   rescue StandardError => e

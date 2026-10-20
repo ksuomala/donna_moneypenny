@@ -6,6 +6,8 @@ Rails.application.configure do
   config.x.categorizer.model = ENV.fetch("CATEGORIZER_MODEL", "claude-haiku-4-5")
   # Ignored on Haiku 4.5, which has no effort setting; used when CATEGORIZER_MODEL is a newer model.
   config.x.categorizer.effort = ENV.fetch("CATEGORIZER_EFFORT", "medium")
+  # Jev (TypeSafe) answers with calibrated confidence; at or above this a choice counts as confident.
+  config.x.categorizer.jev_confidence = Float(ENV.fetch("CATEGORIZER_JEV_CONFIDENCE", "0.9"))
   config.x.categorizer.batch_size = Integer(ENV.fetch("CATEGORIZER_BATCH_SIZE", "50"))
   config.x.categorizer.max_per_run = Integer(ENV.fetch("CATEGORIZER_MAX_PER_RUN", "500"))
   config.x.categorizer.cooldown_days = Integer(ENV.fetch("CATEGORIZER_COOLDOWN_DAYS", "7"))

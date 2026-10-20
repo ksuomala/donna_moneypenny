@@ -2,7 +2,7 @@ namespace :transactions do
   desc "Run the categorizer over the uncategorized backlog now, in the background (shadow unless CATEGORIZER_APPLY). LIMIT=200. DRY_RUN=1 decides one batch inline and stores nothing"
   task categorizer_run: :environment do
     config = Rails.configuration.x.categorizer
-    abort "No Anthropic API key: add anthropic.api_key with bin/rails credentials:edit, or set ANTHROPIC_API_KEY" unless BankTransactions::Categorizer.configured?
+    abort "No API key for #{config.model}: see bin/rails credentials:edit" unless BankTransactions::Categorizer.configured?
 
     if ENV["DRY_RUN"].present?
       batch = BankTransaction.booked.where(transaction_category_id: nil).order(:occurred_on, :id).limit(Integer(ENV.fetch("LIMIT", config.batch_size.to_s))).to_a
@@ -39,11 +39,16 @@ namespace :transactions do
 end
 
 namespace :transactions do
-  desc "Test the categorizer on already categorized transactions sent as new; writes nothing to them. SAMPLE=200 SINCE=2026-01-01"
+  desc "Test the categorizer on already categorized transactions sent as new; writes nothing to them. SAMPLE=200 SINCE=2026-01-01 MODEL=gpt-6-luna|jev-latest|claude-… SEED=1 (same SEED, same sample)"
   task categorizer_eval: :environment do
-    abort "No Anthropic API key: add anthropic.api_key with bin/rails credentials:edit, or set ANTHROPIC_API_KEY" unless BankTransactions::Categorizer.configured?
+    model = ENV["MODEL"].presence || Rails.configuration.x.categorizer.model
+    unless BankTransactions::Categorizer.configured?(model)
+      abort "No API key for #{model}: add anthropic.api_key, openai.api_key or typesafe.api_key with bin/rails credentials:edit " \
+            "(or ANTHROPIC_API_KEY, OPENAI_API_KEY, TYPESAFE_API_KEY)"
+    end
 
     since = ENV["SINCE"].present? ? Date.iso8601(ENV["SINCE"]) : nil
-    puts BankTransactions::CategorizerEval.new(sample: Integer(ENV.fetch("SAMPLE", "200")), since: since).call.report
+    seed = ENV["SEED"].presence&.to_i
+    puts BankTransactions::CategorizerEval.new(sample: Integer(ENV.fetch("SAMPLE", "200")), since: since, model: model, seed: seed).call.report
   end
 end

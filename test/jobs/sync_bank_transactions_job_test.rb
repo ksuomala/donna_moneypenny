@@ -65,6 +65,14 @@ class SyncBankTransactionsJobTest < ActiveJob::TestCase
     assert_equal 1, @second.bank_transactions.count
   end
 
+  test "the categorizer follows the sync, also when an account failed" do
+    assert_enqueued_with(job: CategorizeTransactionsJob) do
+      assert_raises(EnableBanking::Client::Error) do
+        with_client(StubClient.new(failing_uids: [ "acc-1" ])) { SyncBankTransactionsJob.perform_now }
+      end
+    end
+  end
+
   test "expired consent marks the connection expired without calling the bank" do
     @connection.update!(valid_until: 1.day.ago)
 

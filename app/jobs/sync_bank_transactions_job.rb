@@ -25,5 +25,8 @@ class SyncBankTransactionsJob < ApplicationJob
 
     # Fail the job (visible in Solid Queue's failed executions) after trying every account.
     raise EnableBanking::Client::Error, "Bank sync failed for #{failures.size} account(s): #{failures.join('; ')}" if failures.any?
+  ensure
+    # The categorizer follows the sync, also when an account failed: the others' transactions are new.
+    CategorizeTransactionsJob.perform_later
   end
 end

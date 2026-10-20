@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_15_081759) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -78,6 +78,43 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_15_081759) do
     t.index ["bank_account_id"], name: "index_bank_transactions_on_bank_account_id"
     t.index ["loan_id"], name: "index_bank_transactions_on_loan_id"
     t.index ["transaction_category_id"], name: "index_bank_transactions_on_transaction_category_id"
+  end
+
+  create_table "categorization_decisions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "categorization_run_id", null: false
+    t.bigint "bank_transaction_id", null: false
+    t.bigint "transaction_category_id"
+    t.bigint "loan_id"
+    t.integer "confidence", null: false
+    t.string "reason"
+    t.string "guard"
+    t.boolean "applied", default: false, null: false
+    t.datetime "created_at", null: false
+    t.index ["bank_transaction_id"], name: "index_categorization_decisions_on_bank_transaction_id"
+    t.index ["categorization_run_id", "bank_transaction_id"], name: "index_categorization_decisions_on_run_and_transaction", unique: true
+    t.index ["categorization_run_id"], name: "index_categorization_decisions_on_categorization_run_id"
+    t.index ["loan_id"], name: "index_categorization_decisions_on_loan_id"
+    t.index ["transaction_category_id"], name: "index_categorization_decisions_on_transaction_category_id"
+  end
+
+  create_table "categorization_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.integer "mode", default: 0, null: false
+    t.string "model", null: false
+    t.string "prompt_version", null: false
+    t.string "rules_digest", null: false
+    t.datetime "started_at", null: false
+    t.datetime "finished_at"
+    t.integer "transactions_count", default: 0, null: false
+    t.integer "confident_count", default: 0, null: false
+    t.integer "unsure_count", default: 0, null: false
+    t.integer "applied_count", default: 0, null: false
+    t.integer "input_tokens", default: 0, null: false
+    t.integer "output_tokens", default: 0, null: false
+    t.integer "cache_read_input_tokens", default: 0, null: false
+    t.integer "cache_creation_input_tokens", default: 0, null: false
+    t.text "error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "expenses", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -151,6 +188,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_15_081759) do
   add_foreign_key "bank_transactions", "bank_accounts"
   add_foreign_key "bank_transactions", "loans"
   add_foreign_key "bank_transactions", "transaction_categories", on_delete: :nullify
+  add_foreign_key "categorization_decisions", "bank_transactions", on_delete: :cascade
+  add_foreign_key "categorization_decisions", "categorization_runs"
+  add_foreign_key "categorization_decisions", "loans", on_delete: :nullify
+  add_foreign_key "categorization_decisions", "transaction_categories", on_delete: :nullify
   add_foreign_key "loan_balances", "loans"
   add_foreign_key "transaction_categories", "transaction_categories", column: "parent_id"
 end

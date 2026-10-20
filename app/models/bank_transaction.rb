@@ -2,6 +2,7 @@ class BankTransaction < ApplicationRecord
   belongs_to :bank_account
   belongs_to :transaction_category, optional: true
   belongs_to :loan, optional: true
+  has_many :categorization_decisions, dependent: :delete_all
 
   enum :status, { booked: 0, pending: 1 }
 

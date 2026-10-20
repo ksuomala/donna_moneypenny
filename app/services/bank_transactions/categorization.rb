@@ -10,8 +10,9 @@ module BankTransactions
     Result = Data.define(:applied, :skipped)
 
     # Categories with their instructions, plus how counterparties have been categorized so far,
-    # so later runs stay consistent with earlier ones.
-    def self.context
+    # so later runs stay consistent with earlier ones. excluding: transaction ids whose
+    # decisions are left out (the categorizer's evaluation hides the transactions it tests).
+    def self.context(excluding: [])
       lines = [ "# categories: id, name, kind, parent, description" ]
       TransactionCategory.includes(:parent, :children).order(:id).each do |category|
         next if category.children.any?
@@ -30,14 +31,39 @@ module BankTransactions
 
       lines << "" << "# known counterparties: counterparty, account id, category, count"
       names = TransactionCategory.pluck(:id, :name).to_h
-      BankTransaction.where.not(transaction_category_id: nil).where.not(counterparty_name: nil)
-        .group(:counterparty_name, :bank_account_id, :transaction_category_id).order(Arel.sql("COUNT(*) DESC"))
-        .pluck(:counterparty_name, :bank_account_id, :transaction_category_id, Arel.sql("COUNT(*)"))
-        .each do |name, account_id, category_id, count|
-          lines << row(name, account_id, names[category_id], count)
-        end
+      known_decisions(excluding: excluding).each do |name, account_id, category_id, count|
+        lines << row(name, account_id, names[category_id], count)
+      end
 
       lines.join("\n")
+    end
+
+    # How counterparties have been categorized so far: [counterparty, account id, category id,
+    # count], most frequent first.
+    def self.known_decisions(excluding: [])
+      scope = BankTransaction.where.not(transaction_category_id: nil).where.not(counterparty_name: nil)
+      scope = scope.where.not(id: excluding) if excluding.any?
+      scope.group(:counterparty_name, :bank_account_id, :transaction_category_id).order(Arel.sql("COUNT(*) DESC"))
+        .pluck(:counterparty_name, :bank_account_id, :transaction_category_id, Arel.sql("COUNT(*)"))
+    end
+
+    # For each transaction, up to five rows on other accounts with the same amount the other way
+    # round within five days: the candidates for the other side of an own transfer or a credit
+    # card payment. Pending rows count, since the other side is often still pending. Returns
+    # transaction id => rows; hide lists ids whose category the caller must not show.
+    PAIR_WINDOW = 5
+    def self.pairing_hints(transactions, hide: [])
+      transactions.to_h do |t|
+        others = BankTransaction.where.not(bank_account_id: t.bank_account_id).where(amount: -t.amount)
+          .where(occurred_on: (t.occurred_on - PAIR_WINDOW)..(t.occurred_on + PAIR_WINDOW)).order(:occurred_on, :id).limit(5).to_a
+        [ t.id, others ]
+      end
+    end
+
+    # One transaction as the tab-separated line the listings and the categorizer use.
+    def self.transaction_row(t)
+      row(t.id, t.bank_account_id, t.occurred_on, t.amount.to_s("F"), t.currency, t.counterparty_name,
+          t.description, t.reference_number, t.merchant_category_code, t.raw&.dig("bank_transaction_code", "description"))
     end
 
     # The oldest uncategorized booked transactions.
@@ -46,10 +72,7 @@ module BankTransactions
       lines = [ "# uncategorized: #{scope.count} total, showing #{[ limit, scope.count ].min}",
                 "# id, account id, date, amount, currency, counterparty, description, reference, mcc, bank code" ]
 
-      scope.order(:occurred_on, :id).limit(limit).each do |t|
-        lines << row(t.id, t.bank_account_id, t.occurred_on, t.amount.to_s("F"), t.currency, t.counterparty_name,
-                     t.description, t.reference_number, t.merchant_category_code, t.raw&.dig("bank_transaction_code", "description"))
-      end
+      scope.order(:occurred_on, :id).limit(limit).each { |t| lines << transaction_row(t) }
 
       lines.join("\n")
     end
@@ -126,6 +149,5 @@ module BankTransactions
     def self.row(*values)
       values.map { |value| value.to_s.squish }.join("\t")
     end
-    private_class_method :row
   end
 end

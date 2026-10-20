@@ -116,4 +116,35 @@ class BankTransactions::CategorizationTest < ActiveSupport::TestCase
     assert_includes context, "#{@account.id}\tKäyttötili\taccount"
     assert_includes context, "#{card.id}\tCredit Card\tcredit card"
   end
+
+  test "known decisions and context can leave out given transactions" do
+    kept = transaction("a", transaction_category: @groceries)
+    hidden = transaction("b", transaction_category: @apartment)
+
+    assert_equal [ [ "K-Market", @account.id, @groceries.id, 1 ], [ "K-Market", @account.id, @apartment.id, 1 ] ],
+                 BankTransactions::Categorization.known_decisions.sort_by(&:last)
+    assert_equal [ [ "K-Market", @account.id, @groceries.id, 1 ] ], BankTransactions::Categorization.known_decisions(excluding: [ hidden.id ])
+    assert_not_includes BankTransactions::Categorization.context(excluding: [ hidden.id ]), "Apartment A\t1"
+    assert_includes BankTransactions::Categorization.context(excluding: [ hidden.id ]), "Groceries\t1"
+    assert_equal "#{kept.id}\t#{@account.id}\t2026-10-01\t-12.5\tEUR\tK-Market\t\t\t\t", BankTransactions::Categorization.transaction_row(kept)
+  end
+
+  test "pairing hints are the same amount the other way round on another account within five days, pending included" do
+    rental = @account.bank_connection.bank_accounts.create!(uid: "acc-2", name: "Vuokratili", currency: "EUR")
+    build = ->(account, ref, amount, date, status: "booked") do
+      account.bank_transactions.create!(entry_reference: ref, status: status, occurred_on: date, amount: amount, currency: "EUR", counterparty_name: "Me")
+    end
+    out = build.(@account, "out", -300, Date.new(2026, 10, 10))
+    pending_side = build.(rental, "p", 300, Date.new(2026, 10, 12), status: "pending")
+    booked_side = build.(rental, "b", 300, Date.new(2026, 10, 5))
+    build.(rental, "late", 300, Date.new(2026, 10, 16))
+    build.(rental, "wrong", -300, Date.new(2026, 10, 10))
+    build.(@account, "same", 300, Date.new(2026, 10, 10))
+    lone = build.(@account, "lone", -42, Date.new(2026, 10, 10))
+
+    hints = BankTransactions::Categorization.pairing_hints([ out, lone ])
+
+    assert_equal [ booked_side, pending_side ], hints[out.id]
+    assert_equal [], hints[lone.id]
+  end
 end

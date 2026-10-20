@@ -47,7 +47,9 @@ stays the same once they're booked.
 
 - [x] `TransactionCategory` with kind (expense / income / transfer / investment), description and one level of
       sub-categories; transactions go on leaf categories only. Generic defaults in `db/seeds.rb`, own categories via `categories:import`
-- [ ] Categorize transactions automatically (Claude), using the category descriptions as instructions
+- [x] Categorize transactions automatically (Claude), using the category descriptions as instructions
+      (`CategorizeTransactionsJob` after the sync, shadow mode by default, `transactions:categorizer_eval`)
+- [ ] Add the Anthropic API key to the credentials, run the eval in production, then set `CATEGORIZER_APPLY: "true"`
 
 ## Stats
 

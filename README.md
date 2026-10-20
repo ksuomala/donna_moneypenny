@@ -36,6 +36,25 @@ Writes only ever fill in what is missing, so anything you categorised by hand st
 A ready-made [Claude Code skill](.claude/skills/categorize-transactions/SKILL.md) runs this
 workflow end to end.
 
+## Automatic categorisation
+
+After every nightly sync a background job sends the uncategorised transactions to Claude
+(Haiku 4.5 by default, `CATEGORIZER_MODEL` to change it) in batches, with the category
+descriptions, the earlier decisions and every field of each transaction, and gets back a
+decision per transaction in a fixed JSON schema. Code guardrails then turn risky answers into
+unsure ones. Every decision is stored with its reason. Confident ones are written only once
+`CATEGORIZER_APPLY` is `true`; until then the job runs in shadow mode.
+
+```sh
+bin/rails credentials:edit                         # add anthropic: api_key: ...
+bin/rails transactions:categorizer_eval SAMPLE=200 # precision on transactions you already categorised
+bin/rails transactions:categorizer_run DRY_RUN=1   # one batch, printed, nothing stored
+bin/rails transactions:unsure                      # what the latest run wasn't sure about
+bin/rails transactions:categorizer_runs            # runs, tokens and cost
+```
+
+Without an API key the job does nothing.
+
 ## Stack
 
 Rails 8.1 on Ruby 3.4, MySQL, Solid Queue for the daily sync, deployed with Kamal.

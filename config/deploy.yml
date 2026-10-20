@@ -44,6 +44,10 @@ env:
     DB_HOST: donna_moneypenny-db
     DB_USERNAME: root
 
+    # The nightly categorizer (config/initializers/categorizer.rb) stores its decisions but
+    # doesn't write them to the transactions until this is "true".
+    CATEGORIZER_APPLY: "false"
+
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
     SOLID_QUEUE_IN_PUMA: true

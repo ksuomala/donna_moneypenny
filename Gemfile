@@ -19,6 +19,8 @@ gem "jbuilder"
 
 # JSON Web Token signing for the Enable Banking API [https://github.com/jwt/ruby-jwt]
 gem "jwt"
+# Claude API, for the nightly transaction categorizer (BankTransactions::Categorizer)
+gem "anthropic"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"

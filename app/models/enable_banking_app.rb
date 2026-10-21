@@ -10,11 +10,24 @@ class EnableBankingApp < ApplicationRecord
   has_secure_token :callback_token
 
   normalizes :application_id, with: ->(id) { id.strip.presence }
-  normalizes :private_key, with: ->(key) { key.strip.presence && "#{key.strip}\n" }
+  normalizes :private_key, with: ->(key) { normalize_pem(key) }
 
   validates :application_id, uniqueness: true, allow_nil: true
   validates :application_id, :private_key, presence: true, on: :credentials
   validate :private_key_is_an_rsa_private_key, if: :private_key?
+
+  # Rebuilds a pasted PEM key in its standard layout: whatever indentation, tabs, wrapping or
+  # line endings it picked up on the way (YAML, a terminal, an editor), the base64 body has no
+  # whitespace of its own. Text that isn't PEM is kept, for the validation to report.
+  def self.normalize_pem(text)
+    text = text.to_s.strip
+    match = text.match(/-----\s*BEGIN\s+([A-Z][A-Z\s]*?)\s*-----(.*?)-----\s*END\s+[A-Z\s]*?-----/m)
+    return text.presence unless match
+
+    label = match[1].split.join(" ")
+    body = match[2].gsub(/\s+/, "")
+    "-----BEGIN #{label}-----\n#{body.scan(/.{1,64}/).join("\n")}\n-----END #{label}-----\n"
+  end
 
   def configured?
     application_id.present? && private_key.present?

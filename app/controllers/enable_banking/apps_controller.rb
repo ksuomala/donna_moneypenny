@@ -11,10 +11,12 @@ module EnableBanking
     def show
     end
 
-    # Saves the credentials once Enable Banking accepts them. A blank key keeps the stored one.
+    # Saves the credentials once Enable Banking accepts them. The key comes from the uploaded
+    # .pem file or the text field; neither keeps the stored one.
     def update
       @app.application_id = app_params[:application_id]
-      @app.private_key = app_params[:private_key] if app_params[:private_key].present?
+      private_key = app_params[:private_key_file]&.read.presence || app_params[:private_key]
+      @app.private_key = private_key if private_key.present?
 
       if @app.valid?(:credentials) && credentials_accepted? && @app.save(context: :credentials)
         redirect_to root_path, notice: "Enable Banking application saved."
@@ -26,7 +28,7 @@ module EnableBanking
     private
 
     def app_params
-      params.expect(enable_banking_app: %i[application_id private_key])
+      params.expect(enable_banking_app: %i[application_id private_key private_key_file])
     end
 
     # A signed request proves the ID and key belong together and the app is active.

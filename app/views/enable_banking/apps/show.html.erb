@@ -29,9 +29,12 @@
     <%= form.label :application_id, "Application ID" %>
     <%= form.text_field :application_id, required: true, autocomplete: "off", spellcheck: false %>
 
-    <%= form.label :private_key, "Private key" %>
-    <%= form.text_area :private_key, value: nil, rows: 8, required: !@app.private_key?, spellcheck: false,
-          placeholder: @app.private_key? ? "Stored. Paste a new key to replace it." : "-----BEGIN PRIVATE KEY-----" %>
+    <%= form.label :private_key_file, "Private key (.pem file)" %>
+    <%= form.file_field :private_key_file, accept: ".pem,application/x-pem-file" %>
+
+    <%= form.label :private_key, "or paste it" %>
+    <%= form.text_area :private_key, value: nil, rows: 8, spellcheck: false, autocomplete: "off", wrap: "off",
+          placeholder: @app.private_key? ? "Stored. Choose or paste a new key to replace it." : "-----BEGIN PRIVATE KEY-----" %>
 
     <%= form.submit "Save", class: "button" %>
   <% end %>

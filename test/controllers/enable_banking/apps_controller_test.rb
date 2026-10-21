@@ -33,6 +33,17 @@ class EnableBanking::AppsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes EnableBankingApp.connection.select_value("SELECT private_key FROM enable_banking_apps WHERE id = #{app.id}"), "PRIVATE KEY"
   end
 
+  test "takes the key from an uploaded .pem file" do
+    file = Rack::Test::UploadedFile.new(StringIO.new(ENABLE_BANKING_TEST_KEY), "application/x-pem-file", original_filename: "app.pem")
+
+    with_enable_banking_client(EnableBanking::FakeClient.new) do
+      patch enable_banking_app_path, params: { enable_banking_app: { application_id: "app-new", private_key_file: file, private_key: "" } }
+    end
+
+    assert_redirected_to root_path
+    assert_equal ENABLE_BANKING_TEST_KEY, @user.reload.enable_banking_app.private_key
+  end
+
   test "rejects credentials that Enable Banking refuses" do
     fake = EnableBanking::FakeClient.new(aspsps_error: EnableBanking::Client::Error.new("401 unauthorized"))
 
@@ -65,7 +76,7 @@ class EnableBanking::AppsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_redirected_to root_path
-    assert_equal [ "app-renamed", ENABLE_BANKING_TEST_KEY.strip + "\n" ], app.reload.values_at(:application_id, :private_key)
+    assert_equal [ "app-renamed", ENABLE_BANKING_TEST_KEY ], app.reload.values_at(:application_id, :private_key)
   end
 
   test "another user's application ID is refused" do

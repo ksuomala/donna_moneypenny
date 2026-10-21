@@ -1,20 +1,26 @@
 module EnableBanking
-  # Starts a bank login: asks Enable Banking for an authorization URL and sends the user
-  # to the bank. The bank later redirects back to SessionsController#create.
+  # Starts a bank login with the signed-in user's own Enable Banking application: asks it for an
+  # authorization URL and sends the user to the bank. The bank later redirects back to the app's
+  # callback, SessionsController#create.
   class AuthorizationsController < ApplicationController
+    include CallbackUrl
+
     ASPSP_NAME = "Nordea"
     ASPSP_COUNTRY = "FI"
     FALLBACK_CONSENT_VALIDITY = 90.days
 
     def create
-      client = EnableBanking::Client.build
+      app = Current.user.enable_banking_app
+      return redirect_to(enable_banking_app_path, alert: "Set up your Enable Banking application first.") unless app&.configured?
+
+      client = app.client
       state = SecureRandom.urlsafe_base64(32)
       session[:enable_banking_state] = state
 
       authorization = client.start_authorization(
         aspsp_name: ASPSP_NAME,
         country: ASPSP_COUNTRY,
-        redirect_url: redirect_url,
+        redirect_url: enable_banking_callback_url_for(app),
         state: state,
         valid_until: consent_valid_until(client)
       )
@@ -25,10 +31,6 @@ module EnableBanking
     end
 
     private
-
-    def redirect_url
-      Rails.configuration.x.enable_banking.redirect_url || enable_banking_sessions_url
-    end
 
     # Ask for the longest consent the bank allows (Nordea: 180 days), minus a safety margin.
     def consent_valid_until(client)

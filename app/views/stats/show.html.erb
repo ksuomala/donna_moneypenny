@@ -1,7 +1,7 @@
 <% content_for :title, "Stats · Donna Moneypenny" %>
 
 <main class="page stats">
-  <nav class="page-nav"><%= link_to "Bank connections", root_path %></nav>
+  <nav class="page-nav"><%= link_to "Bank connections", root_path %><%= button_to "Sign out", session_path, method: :delete, class: "link-button", form_class: "button-to" %></nav>
 
   <h1>Stats</h1>
   <p class="muted stats-period"><%= stats_period_label(@range) %></p>

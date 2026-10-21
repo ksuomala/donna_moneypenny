@@ -17,7 +17,7 @@ class StatsController < ApplicationController
       else
         custom_range
       end
-    @stats = BankTransactions::Stats.new(@range)
+    @stats = BankTransactions::Stats.new(@range, user: Current.user)
   end
 
   private

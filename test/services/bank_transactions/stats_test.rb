@@ -18,7 +18,8 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
                                        amount: amount, currency: "EUR", transaction_category: category)
   end
 
-  def stats = BankTransactions::Stats.new(@range)
+  # Records created outside a request belong to the owner.
+  def stats = BankTransactions::Stats.new(@range, user: User.owner)
 
   test "an investment's rent and costs net into one income" do
     txn(1000, @flat)

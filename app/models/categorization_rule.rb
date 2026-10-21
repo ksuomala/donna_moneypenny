@@ -5,6 +5,8 @@
 # own history (BankTransactions::Rules.derive!); manual ones are set with rules:upsert, e.g.
 # for loan installments whose reference changes every month but keeps a prefix.
 class CategorizationRule < ApplicationRecord
+  include OwnedByUser
+
   belongs_to :transaction_category
   belongs_to :loan, optional: true
   belongs_to :bank_account, optional: true
@@ -55,6 +57,10 @@ class CategorizationRule < ApplicationRecord
   end
 
   private
+
+  def default_owner
+    transaction_category&.user || super
+  end
 
   def names_a_reference
     precise = reference.present? || reference_prefix.present? || (counterparty.present? && amount.present?)

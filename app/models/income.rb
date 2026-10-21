@@ -1,4 +1,6 @@
 class Income < ApplicationRecord
+  include OwnedByUser
+
   enum :source, {
     salary: 0,
     freelance: 1,

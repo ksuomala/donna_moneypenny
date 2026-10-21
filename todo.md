@@ -3,6 +3,29 @@
 Goal: read Nordea transactions through Enable Banking and store them in the database.
 Server and infrastructure tasks live in the devops repo (`~/code_ksuomala/devops`, `docs/open-issues.md`).
 
+## Next: multiple users, each with their own Enable Banking app
+
+Each user registers their own Enable Banking application in the Control Panel and activates it in restricted
+mode by linking their own accounts. That app can reach only those linked accounts, and nobody needs a contract
+with Enable Banking. Restrictions and redirect URLs are set per application.
+
+- [ ] Check that a second app can register the same redirect URL (`https://donamoneypenny.app/enable_banking/sessions`)
+- [ ] Decide: fully separate data per user, or households sharing categories, rules and stats
+- [ ] Decide: accounts created by the owner only (rake task / console), or open sign-up
+- [x] `User` model with login (`bin/rails generate authentication`), replacing HTTP basic auth; users created with `users:create`, no sign-up
+- [ ] Each user's Enable Banking app ID and private key stored encrypted in the database (Active Record encryption),
+      with a settings page to enter them; `EnableBanking::Client` built from the current user's credentials
+- [x] `user_id` on the user's data (bank connections, categories, rules, loans, categorizer runs, expenses, incomes;
+      accounts and transactions through their connection); pages limited to the signed-in user
+- [ ] Production: deploy, then `bin/kamal app exec -i 'bin/rails users:create EMAIL=...'` to create the owner and claim the existing data
+- [ ] Then a migration making `user_id` NOT NULL (and `belongs_to :user` required); `db/seeds.rb` needs a user to own the defaults by then
+- [ ] Remove `basic_auth:` from the encrypted credentials
+- [ ] Rake tasks, the categorizer and the rules limited to one user (`USER=` / per-user jobs); until then they fall back to `User.owner`
+- [ ] Callback signs the `POST /sessions` code exchange with the signed-in user's own app key
+- [ ] Daily sync and categorizer run per user, each with that user's client
+- [x] Assign existing data to the first user (`users:create` claims every row without an owner)
+- [ ] Move the current Enable Banking app credentials to the first user
+
 ## Enable Banking: setup (done)
 
 - [x] Enable Banking client that signs RS256 JWTs (`app/services/enable_banking/client.rb`)
@@ -67,7 +90,6 @@ stays the same once they're booked.
 ## Later
 
 - [ ] Map bank transactions to `Expense` / `Income` categories (rules by counterparty or message)
-- [ ] Replace basic auth with proper login (`bin/rails generate authentication`) if more than one device or user needs it
 - [ ] Add a contact email to `/privacy` and `/terms`
 
 ## Credit cards and balances (issue #5)

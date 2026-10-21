@@ -53,6 +53,71 @@
   color: #991b1b;
 }
 
+.page-nav .button-to {
+  display: inline;
+  margin-left: 1rem;
+}
+
+.page-nav .link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #1d4ed8;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sign-in {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 20rem;
+}
+
+.sign-in input:not([type="submit"]) {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.4rem;
+  font: inherit;
+}
+
+.sign-in .button {
+  margin-top: 0.8rem;
+  justify-self: start;
+}
+
+.settings-form {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 36rem;
+}
+
+.settings-form input:not([type="submit"]),
+.settings-form textarea {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.4rem;
+  font: inherit;
+}
+
+.settings-form textarea {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+.settings-form .button {
+  margin-top: 0.8rem;
+  justify-self: start;
+}
+
+.settings-form .flash p {
+  margin: 0;
+}
+
+.callback-url {
+  overflow-wrap: anywhere;
+}
+
 .connection {
   margin-top: 2rem;
   padding-top: 1rem;
@@ -68,7 +133,8 @@
     color: #9ca3af;
   }
 
-  .page-nav a {
+  .page-nav a,
+  .page-nav .link-button {
     color: #93c5fd;
   }
 

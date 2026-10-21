@@ -60,6 +60,20 @@ bin/rails transactions:categorizer_runs            # runs, tokens and cost
 
 Without an API key the job does nothing.
 
+## Users
+
+Every page needs a sign-in (Rails' built-in authentication). There is no sign-up page and no
+password reset by email; users are created and their passwords changed from the command line:
+
+```sh
+bin/rails users:create EMAIL=you@example.com   # asks for the password (12+ characters)
+bin/rails users:password EMAIL=you@example.com # also signs out its sessions
+```
+
+Each user has their own bank connections, categories, rules and loans. The first user created
+also gets every record that has no owner yet. The nightly sync, the categorizer and the rake
+tasks still work on the first user's data.
+
 ## Stack
 
 Rails 8.1 on Ruby 3.4, MySQL, Solid Queue for the daily sync, deployed with Kamal.

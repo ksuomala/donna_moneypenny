@@ -1,4 +1,6 @@
 class TransactionCategory < ApplicationRecord
+  include OwnedByUser
+
   belongs_to :parent, class_name: "TransactionCategory", optional: true
   has_many :children, class_name: "TransactionCategory", foreign_key: :parent_id, dependent: :restrict_with_error
   has_many :bank_transactions, dependent: :nullify
@@ -48,13 +50,17 @@ class TransactionCategory < ApplicationRecord
   end
 
 
-  validates :name, presence: true, uniqueness: true
+  validates :name, presence: true, uniqueness: { scope: :user_id }
   validates :kind, presence: true, unless: :exclude_from_stats?
   validates :kind, absence: true, if: :exclude_from_stats?
   validate :at_most_two_levels
   validate :same_kind_as_parent
 
   private
+
+  def default_owner
+    parent&.user || super
+  end
 
   def at_most_two_levels
     errors.add(:parent, "can't itself have a parent") if parent&.parent_id

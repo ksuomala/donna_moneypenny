@@ -3,6 +3,8 @@
 # the confident ones to the transactions, eval runs test the categorizer on transactions that
 # already have a category (transactions:categorizer_eval).
 class CategorizationRun < ApplicationRecord
+  include OwnedByUser
+
   has_many :decisions, class_name: "CategorizationDecision", dependent: :delete_all
 
   enum :mode, { shadow: 0, apply: 1, eval: 2 }

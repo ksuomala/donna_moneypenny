@@ -2,9 +2,10 @@ require "test_helper"
 
 class StatsControllerTest < ActionDispatch::IntegrationTest
   setup do
-    connection = BankConnection.create!(session_id: "s", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now)
+    sign_in_as(@user = users(:one))
+    connection = @user.bank_connections.create!(session_id: "s", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now)
     @account = connection.bank_accounts.create!(uid: "acc-1", name: "Käyttötili", currency: "EUR")
-    @groceries = TransactionCategory.create!(name: "Groceries", kind: :expense)
+    @groceries = @user.transaction_categories.create!(name: "Groceries", kind: :expense)
     @today = Time.find_zone("Europe/Helsinki").today
   end
 
@@ -13,16 +14,32 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
                                        currency: "EUR", transaction_category: @groceries)
   end
 
-  test "requires the owner login" do
+  test "requires signing in" do
+    sign_out
     get stats_path
-    assert_response :unauthorized
+    assert_redirected_to new_session_path
+  end
+
+  test "shows only the signed-in user's data" do
+    txn(-42.5, @today)
+    loan = @user.loans.create!(name: "Mortgage", creditor: "Nordea")
+    loan.balances.create!(on: @today, balance: 1000)
+    @account.balances.create!(on: @today, booked: 500)
+
+    sign_in_as(users(:two))
+    get stats_path
+
+    assert_response :success
+    assert_select ".bar-row", 0
+    assert_select "table.loans", 0
+    assert_select "table.accounts", 0
   end
 
   test "defaults to this month" do
     txn(-42.5, @today)
     txn(-99, @today.prev_month.end_of_month)
 
-    get stats_path, headers: owner_auth
+    get stats_path
 
     assert_response :success
     assert_select ".chip-active", "This month"
@@ -35,7 +52,7 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     txn(-10, @today.beginning_of_year)
     txn(-20, @today)
 
-    get stats_path(period: "year"), headers: owner_auth
+    get stats_path(period: "year")
 
     assert_select ".chip-active", "This year"
     assert_select ".bar-value", "30,00 €"
@@ -45,7 +62,7 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     txn(-10, Date.new(2026, 1, 15))
     txn(-20, Date.new(2026, 3, 1))
 
-    get stats_path(from: "2026-01-01", to: "2026-02-28"), headers: owner_auth
+    get stats_path(from: "2026-01-01", to: "2026-02-28")
 
     assert_select ".chip-active", 0
     assert_select ".bar-value", "10,00 €"
@@ -54,12 +71,12 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
 
   test "pie folds the smallest categories into Other past eight" do
     9.times do |i|
-      category = TransactionCategory.create!(name: "Category #{i}", kind: :expense)
+      category = @user.transaction_categories.create!(name: "Category #{i}", kind: :expense)
       @account.bank_transactions.create!(entry_reference: "r#{i}", occurred_on: @today, amount: -(i + 1),
                                          currency: "EUR", transaction_category: category)
     end
 
-    get stats_path, headers: owner_auth
+    get stats_path
 
     assert_select ".bar-row", 9
     assert_select "svg.pie path.pie-slice", 8
@@ -71,7 +88,7 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     txn(-10, month)
     txn(-20, month.next_month)
 
-    get stats_path(month: month.strftime("%Y-%m")), headers: owner_auth
+    get stats_path(month: month.strftime("%Y-%m"))
 
     assert_select ".month-tab", 12
     assert_select ".month-tab:first-child", month.strftime("%b %y")
@@ -82,17 +99,17 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the current month's tab is active by default" do
-    get stats_path, headers: owner_auth
+    get stats_path
 
     assert_select ".month-tab-active", @today.strftime("%b %y")
   end
 
   test "loans are listed below income and expenses" do
-    loan = Loan.create!(name: "Mortgage", creditor: "Nordea")
+    loan = @user.loans.create!(name: "Mortgage", creditor: "Nordea")
     loan.balances.create!(on: @today.beginning_of_month - 1, balance: 250_000)
     loan.balances.create!(on: @today, balance: 249_200)
 
-    get stats_path, headers: owner_auth
+    get stats_path
 
     assert_select "table.loans tbody tr", 1
     assert_select "table.loans td", "249 200,00 €"
@@ -100,11 +117,11 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "loans table totals what was taken and paid" do
-    loan = Loan.create!(name: "Car loan", creditor: "Nordea Rahoitus")
+    loan = @user.loans.create!(name: "Car loan", creditor: "Nordea Rahoitus")
     @account.bank_transactions.create!(entry_reference: "taken", occurred_on: @today, amount: 12_000, currency: "EUR", loan:)
     @account.bank_transactions.create!(entry_reference: "paid", occurred_on: @today, amount: -250, currency: "EUR", loan:)
 
-    get stats_path, headers: owner_auth
+    get stats_path
 
     assert_select "table.loans tfoot td", "12 000,00 €"
     assert_select "table.loans tfoot td", "250,00 €"
@@ -118,7 +135,7 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
                               raw: { "credit_limit" => { "amount" => "5000" } })
     card.balances.create!(on: @today, booked: -2345.67)
 
-    get stats_path, headers: owner_auth
+    get stats_path
 
     assert_select "table.accounts tbody tr", 1
     assert_select "table.accounts td", "1 234,56 €"

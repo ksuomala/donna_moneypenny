@@ -1,6 +1,7 @@
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
+require_relative "test_helpers/session_test_helper"
 Dir[File.expand_path("support/**/*.rb", __dir__)].each { |file| require file }
 
 # Tests never reach a model provider: an unstubbed client raises instead of spending tokens.
@@ -21,11 +22,6 @@ module ActiveSupport
 end
 
 class ActionDispatch::IntegrationTest
-  def owner_auth
-    login = Rails.application.credentials.basic_auth
-    { "HTTP_AUTHORIZATION" => ActionController::HttpAuthentication::Basic.encode_credentials(login[:username], login[:password]) }
-  end
-
   # Swaps EnableBanking::Client.build for the given fake for the duration of the block.
   def with_enable_banking_client(fake)
     original = EnableBanking::Client.factory

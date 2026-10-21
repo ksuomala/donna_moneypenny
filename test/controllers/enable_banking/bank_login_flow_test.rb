@@ -12,22 +12,26 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     ]
   }.freeze
 
-  test "pages require the owner login" do
+  setup { sign_in_as(@user = users(:one)) }
+
+  test "pages require signing in" do
+    sign_out
+
     get root_path
-    assert_response :unauthorized
+    assert_redirected_to new_session_path
 
     post enable_banking_authorization_path
-    assert_response :unauthorized
+    assert_redirected_to new_session_path
 
     get enable_banking_sessions_path, params: { code: "x", state: "y" }
-    assert_response :unauthorized
+    assert_redirected_to new_session_path
   end
 
   test "connect sends the user to the bank with a state and the longest consent" do
     fake = EnableBanking::FakeClient.new
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path, headers: owner_auth
+      post enable_banking_authorization_path
     end
 
     assert_redirected_to "https://bank.example/authorize?id=123"
@@ -43,11 +47,11 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     fake = EnableBanking::FakeClient.new(session_data: SESSION_DATA)
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path, headers: owner_auth
+      post enable_banking_authorization_path
       state = session[:enable_banking_state]
 
       assert_difference -> { BankConnection.count } => 1, -> { BankAccount.count } => 2 do
-        get enable_banking_sessions_path, params: { code: "the-code", state: state }, headers: owner_auth
+        get enable_banking_sessions_path, params: { code: "the-code", state: state }
       end
     end
 
@@ -56,10 +60,11 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
 
     connection = BankConnection.last
     assert_equal "sess-1", connection.session_id
+    assert_equal @user, connection.user
     assert connection.usable?
     assert_equal %w[FI2112345600000785 FI5542345670000081], connection.bank_accounts.order(:uid).pluck(:iban)
 
-    follow_redirect! headers: owner_auth
+    follow_redirect!
     assert_select ".flash-notice", /Connected to Nordea: 2 account/
     assert_select "li", /Käyttötili/
   end
@@ -68,10 +73,10 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     fake = EnableBanking::FakeClient.new(session_data: SESSION_DATA)
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path, headers: owner_auth
+      post enable_banking_authorization_path
 
       assert_no_difference -> { BankConnection.count } do
-        get enable_banking_sessions_path, params: { code: "the-code", state: "forged" }, headers: owner_auth
+        get enable_banking_sessions_path, params: { code: "the-code", state: "forged" }
       end
     end
 
@@ -80,7 +85,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
   end
 
   test "callback reports a cancelled bank login" do
-    get enable_banking_sessions_path, params: { error: "access_denied", error_description: "User cancelled" }, headers: owner_auth
+    get enable_banking_sessions_path, params: { error: "access_denied", error_description: "User cancelled" }
 
     assert_redirected_to root_path
     assert_equal "Bank login was cancelled or failed: User cancelled", flash[:alert]
@@ -110,6 +115,25 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     assert_equal "Credit Card", account.display_name
   end
 
+  test "another user connecting the same account gets an account of their own" do
+    mine = users(:one).bank_connections.record_session!(SESSION_DATA)
+    theirs = users(:two).bank_connections.record_session!(SESSION_DATA.merge(
+      "session_id" => "sess-2",
+      "accounts" => [ { "uid" => "acc-1-two", "account_id" => { "iban" => "FI2112345600000785" }, "currency" => "EUR" } ]
+    ))
+
+    assert_equal users(:two), theirs.user
+    assert_equal [ mine, theirs ], BankAccount.where(iban: "FI2112345600000785").order(:id).map(&:bank_connection)
+  end
+
+  test "the bank connections page lists only the signed-in user's connections" do
+    users(:two).bank_connections.record_session!(SESSION_DATA)
+
+    get root_path
+
+    assert_select "p", "No banks connected yet."
+  end
+
   test "account names use the product, not the holder name" do
     connection = BankConnection.record_session!(SESSION_DATA.merge("accounts" => [
       { "uid" => "acc-9", "account_id" => { "iban" => "FI1410093000123458" }, "name" => "DOE JANE", "product" => "Käyttötili", "currency" => "EUR" }
@@ -122,7 +146,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     fake = EnableBanking::FakeClient.new(error: EnableBanking::Client::Error.new("boom"))
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path, headers: owner_auth
+      post enable_banking_authorization_path
     end
 
     assert_redirected_to root_path

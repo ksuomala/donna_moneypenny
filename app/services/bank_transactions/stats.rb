@@ -1,5 +1,5 @@
 module BankTransactions
-  # Totals per category for a date range, split into incomes and expenses.
+  # A user's totals per category for a date range, split into incomes and expenses.
   #
   # Expense and income categories show their totals as positive amounts (refunds reduce an
   # expense). Each investment sub-category is netted into one figure: rent 1000 minus vastike 280
@@ -27,10 +27,11 @@ module BankTransactions
     # during it (nil when we don't know).
     AccountRow = Data.define(:name, :balance, :change)
 
-    attr_reader :range
+    attr_reader :range, :user
 
-    def initialize(range)
+    def initialize(range, user:)
       @range = range
+      @user = user
     end
 
     # Slices are signed, so money in is income and money out an expense whatever the kind.
@@ -59,7 +60,7 @@ module BankTransactions
     # Current and savings accounts with the balance the bank last reported on or before the
     # end of the range.
     def accounts
-      @accounts ||= BankAccount.deposit.order(:id).map do |account|
+      @accounts ||= user.bank_accounts.deposit.order(:id).map do |account|
         balance = account.balance_on(range.end)
         before = account.balance_on(range.begin - 1)
         AccountRow.new(name: account.display_name, balance:, change: (balance - before if balance && before))
@@ -71,7 +72,7 @@ module BankTransactions
     private
 
     def scope
-      BankTransaction.booked.where(occurred_on: range)
+      user.bank_transactions.booked.where(occurred_on: range)
     end
 
     def slices
@@ -106,7 +107,7 @@ module BankTransactions
     end
 
     def loan_rows
-      Loan.order(:name).filter_map do |loan|
+      user.loans.order(:name).filter_map do |loan|
         balance = loan.balance_on(range.end)
         before = loan.balance_on(range.begin - 1)
         moved = loan.bank_transactions.booked.where(occurred_on: range)
@@ -122,7 +123,7 @@ module BankTransactions
     # purchases are already in the expenses and payments onto it are Own, so it has no taken
     # and paid. A card with nothing owed and nothing moving in the range is left out.
     def credit_card_rows
-      CreditCard.order(:id).filter_map do |card|
+      user.bank_accounts.where(type: CreditCard.sti_name).order(:id).filter_map do |card|
         balance = card.owed_on(range.end)
         before = card.owed_on(range.begin - 1)
         next if balance&.zero? && card.bank_transactions.booked.where(occurred_on: range).none?

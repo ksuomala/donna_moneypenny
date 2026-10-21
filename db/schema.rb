@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -51,7 +51,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
     t.json "raw"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id"
+    t.bigint "enable_banking_app_id"
+    t.index ["enable_banking_app_id"], name: "index_bank_connections_on_enable_banking_app_id"
     t.index ["session_id"], name: "index_bank_connections_on_session_id", unique: true
+    t.index ["user_id"], name: "index_bank_connections_on_user_id"
   end
 
   create_table "bank_transactions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -114,12 +118,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
     t.string "note"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id"
     t.index ["bank_account_id"], name: "index_categorization_rules_on_bank_account_id"
     t.index ["counterparty", "amount"], name: "index_categorization_rules_on_counterparty_and_amount"
     t.index ["loan_id"], name: "index_categorization_rules_on_loan_id"
     t.index ["reference"], name: "index_categorization_rules_on_reference"
     t.index ["reference_prefix"], name: "index_categorization_rules_on_reference_prefix"
     t.index ["transaction_category_id"], name: "index_categorization_rules_on_transaction_category_id"
+    t.index ["user_id"], name: "index_categorization_rules_on_user_id"
   end
 
   create_table "categorization_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -140,6 +146,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
     t.text "error"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id"
+    t.index ["user_id"], name: "index_categorization_runs_on_user_id"
+  end
+
+  create_table "enable_banking_apps", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "application_id"
+    t.text "private_key"
+    t.string "callback_token", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id"], name: "index_enable_banking_apps_on_application_id", unique: true
+    t.index ["callback_token"], name: "index_enable_banking_apps_on_callback_token", unique: true
+    t.index ["user_id"], name: "index_enable_banking_apps_on_user_id", unique: true
   end
 
   create_table "expenses", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -154,8 +174,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
     t.string "currency", default: "USD", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id"
     t.index ["category"], name: "index_expenses_on_category"
     t.index ["occurred_on"], name: "index_expenses_on_occurred_on"
+    t.index ["user_id"], name: "index_expenses_on_user_id"
   end
 
   create_table "incomes", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -170,8 +192,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
     t.string "currency", default: "USD", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "user_id"
     t.index ["received_on"], name: "index_incomes_on_received_on"
     t.index ["source"], name: "index_incomes_on_source"
+    t.index ["user_id"], name: "index_incomes_on_user_id"
   end
 
   create_table "loan_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -193,7 +217,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
     t.boolean "balance_from_transactions", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["name"], name: "index_loans_on_name", unique: true
+    t.bigint "user_id"
+    t.index ["user_id", "name"], name: "index_loans_on_user_id_and_name", unique: true
+  end
+
+  create_table "sessions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "ip_address"
+    t.string "user_agent"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
   create_table "transaction_categories", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -204,12 +238,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
     t.text "description"
     t.bigint "parent_id"
     t.boolean "exclude_from_stats", default: false, null: false
-    t.index ["name"], name: "index_transaction_categories_on_name", unique: true
+    t.bigint "user_id"
     t.index ["parent_id"], name: "index_transaction_categories_on_parent_id"
+    t.index ["user_id", "name"], name: "index_transaction_categories_on_user_id_and_name", unique: true
+  end
+
+  create_table "users", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "email_address", null: false
+    t.string "password_digest", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
   add_foreign_key "bank_account_balances", "bank_accounts"
   add_foreign_key "bank_accounts", "bank_connections"
+  add_foreign_key "bank_connections", "enable_banking_apps"
+  add_foreign_key "bank_connections", "users"
   add_foreign_key "bank_transactions", "bank_accounts"
   add_foreign_key "bank_transactions", "categorization_rules", on_delete: :nullify
   add_foreign_key "bank_transactions", "loans"
@@ -221,6 +266,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_090000) do
   add_foreign_key "categorization_rules", "bank_accounts"
   add_foreign_key "categorization_rules", "loans"
   add_foreign_key "categorization_rules", "transaction_categories"
+  add_foreign_key "categorization_rules", "users"
+  add_foreign_key "categorization_runs", "users"
+  add_foreign_key "enable_banking_apps", "users"
+  add_foreign_key "expenses", "users"
+  add_foreign_key "incomes", "users"
   add_foreign_key "loan_balances", "loans"
+  add_foreign_key "loans", "users"
+  add_foreign_key "sessions", "users"
   add_foreign_key "transaction_categories", "transaction_categories", column: "parent_id"
+  add_foreign_key "transaction_categories", "users"
 end

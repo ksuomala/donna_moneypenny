@@ -17,7 +17,9 @@ module BankTransactions
     # The day a balance snapshot is filed under: the sync runs in the evening Helsinki time.
     TIME_ZONE = "Europe/Helsinki"
 
-    def initialize(bank_account, client: EnableBanking::Client.build)
+    # The client defaults to the app the account's connection was made with: the session is
+    # bound to that app, so only its key can read the account.
+    def initialize(bank_account, client: bank_account.bank_connection.enable_banking_app&.client)
       @account = bank_account
       @client = client
     end

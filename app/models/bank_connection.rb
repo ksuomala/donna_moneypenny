@@ -1,7 +1,11 @@
 # One Enable Banking session: the consent given at a bank, valid until valid_until.
 # Reconnecting (e.g. after the consent expires) creates a new connection; accounts are
-# matched by IBAN so they carry over to the newest connection.
+# matched by IBAN so they carry over to the user's newest connection.
 class BankConnection < ApplicationRecord
+  include OwnedByUser
+
+  # The app whose key signs every request on this connection's session and accounts.
+  belongs_to :enable_banking_app, optional: true
   has_many :bank_accounts, dependent: :restrict_with_error
 
   enum :status, { active: 0, expired: 1, revoked: 2 }
@@ -32,8 +36,10 @@ class BankConnection < ApplicationRecord
 
     # identification_hash is Enable Banking's stable account identity across sessions;
     # IBAN is the fallback (cards have no IBAN, so they rely on the hash).
-    record = (identification_hash && BankAccount.find_by(identification_hash: identification_hash)) ||
-      (iban && BankAccount.find_by(iban: iban)) ||
+    # Only this user's accounts carry over: another user's login to the same account gets its own.
+    own = BankAccount.owned_by(user_id)
+    record = (identification_hash && own.find_by(identification_hash: identification_hash)) ||
+      (iban && own.find_by(iban: iban)) ||
       BankAccount.new
     record.update!(
       bank_connection: self,

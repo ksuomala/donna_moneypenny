@@ -21,11 +21,19 @@ module ActiveSupport
   end
 end
 
-class ActionDispatch::IntegrationTest
-  # Swaps EnableBanking::Client.build for the given fake for the duration of the block.
+class ActiveSupport::TestCase
+  # One key for every test Enable Banking app: generating RSA keys is slow.
+  ENABLE_BANKING_TEST_KEY = OpenSSL::PKey::RSA.new(2048).to_pem
+
+  def create_enable_banking_app(user, application_id: "app-#{user.id}")
+    user.create_enable_banking_app!(application_id: application_id, private_key: ENABLE_BANKING_TEST_KEY)
+  end
+
+  # Swaps the client EnableBanking::Client.for builds for the given fake for the duration of the
+  # block. The fake learns which app it was built for, if it asks (app=).
   def with_enable_banking_client(fake)
     original = EnableBanking::Client.factory
-    EnableBanking::Client.factory = -> { fake }
+    EnableBanking::Client.factory = ->(app) { fake.tap { fake.app = app if fake.respond_to?(:app=) } }
     yield
   ensure
     EnableBanking::Client.factory = original

@@ -12,7 +12,10 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     ]
   }.freeze
 
-  setup { sign_in_as(@user = users(:one)) }
+  setup do
+    sign_in_as(@user = users(:one))
+    @app = create_enable_banking_app(@user)
+  end
 
   test "pages require signing in" do
     sign_out
@@ -23,7 +26,10 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     post enable_banking_authorization_path
     assert_redirected_to new_session_path
 
-    get enable_banking_sessions_path, params: { code: "x", state: "y" }
+    get enable_banking_callback_path(@app.callback_token), params: { code: "x", state: "y" }
+    assert_redirected_to new_session_path
+
+    get enable_banking_app_path
     assert_redirected_to new_session_path
   end
 
@@ -38,7 +44,8 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     _, args = fake.calls.assoc(:start_authorization)
     assert_equal "Nordea", args[:aspsp_name]
     assert_equal "FI", args[:country]
-    assert_equal "http://www.example.com/enable_banking/sessions", args[:redirect_url]
+    assert_equal "http://www.example.com/enable_banking/sessions/#{@app.callback_token}", args[:redirect_url]
+    assert_equal @app, fake.app
     assert_equal session[:enable_banking_state], args[:state]
     assert_in_delta 180.days.from_now, args[:valid_until], 2.hours
   end
@@ -51,9 +58,11 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
       state = session[:enable_banking_state]
 
       assert_difference -> { BankConnection.count } => 1, -> { BankAccount.count } => 2 do
-        get enable_banking_sessions_path, params: { code: "the-code", state: state }
+        get enable_banking_callback_path(@app.callback_token), params: { code: "the-code", state: state }
       end
     end
+
+    assert_equal @app, fake.app
 
     assert_redirected_to root_path
     assert_equal [ :create_session, "the-code" ], fake.calls.assoc(:create_session)
@@ -61,6 +70,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     connection = BankConnection.last
     assert_equal "sess-1", connection.session_id
     assert_equal @user, connection.user
+    assert_equal @app, connection.enable_banking_app
     assert connection.usable?
     assert_equal %w[FI2112345600000785 FI5542345670000081], connection.bank_accounts.order(:uid).pluck(:iban)
 
@@ -76,7 +86,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
       post enable_banking_authorization_path
 
       assert_no_difference -> { BankConnection.count } do
-        get enable_banking_sessions_path, params: { code: "the-code", state: "forged" }
+        get enable_banking_callback_path(@app.callback_token), params: { code: "the-code", state: "forged" }
       end
     end
 
@@ -84,8 +94,36 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     assert_nil fake.calls.assoc(:create_session)
   end
 
+  test "connect asks for the user's own Enable Banking application first" do
+    @app.destroy!
+
+    with_enable_banking_client(EnableBanking::FakeClient.new) do
+      post enable_banking_authorization_path
+    end
+
+    assert_redirected_to enable_banking_app_path
+  end
+
+  test "callback refuses another user's app" do
+    theirs = create_enable_banking_app(users(:two))
+    fake = EnableBanking::FakeClient.new(session_data: SESSION_DATA)
+
+    with_enable_banking_client(fake) do
+      post enable_banking_authorization_path
+      state = session[:enable_banking_state]
+
+      assert_no_difference -> { BankConnection.count } do
+        get enable_banking_callback_path(theirs.callback_token), params: { code: "the-code", state: state }
+      end
+    end
+
+    assert_redirected_to root_path
+    assert_match "not started with your Enable Banking application", flash[:alert]
+    assert_nil fake.calls.assoc(:create_session)
+  end
+
   test "callback reports a cancelled bank login" do
-    get enable_banking_sessions_path, params: { error: "access_denied", error_description: "User cancelled" }
+    get enable_banking_callback_path(@app.callback_token), params: { error: "access_denied", error_description: "User cancelled" }
 
     assert_redirected_to root_path
     assert_equal "Bank login was cancelled or failed: User cancelled", flash[:alert]

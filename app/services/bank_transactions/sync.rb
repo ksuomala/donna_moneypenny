@@ -19,7 +19,7 @@ module BankTransactions
 
     # The client defaults to the app the account's connection was made with: the session is
     # bound to that app, so only its key can read the account.
-    def initialize(bank_account, client: bank_account.bank_connection.enable_banking_app&.client)
+    def initialize(bank_account, client: EnableBanking::Client.for(bank_account.bank_connection.enable_banking_app))
       @account = bank_account
       @client = client
     end

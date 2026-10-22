@@ -6,6 +6,7 @@ class User < ApplicationRecord
   OWNED_MODELS = %w[BankConnection TransactionCategory CategorizationRule CategorizationRun Loan Expense Income].freeze
 
   has_secure_password
+  belongs_to :household, optional: true
   has_many :sessions, dependent: :destroy
   has_one :enable_banking_app, dependent: :destroy
 
@@ -26,6 +27,11 @@ class User < ApplicationRecord
 
   # The first user. Rake tasks and background jobs work on the owner's data until they run per user.
   def self.owner = order(:id).first
+
+  # This user and the other members of their household, for the combined stats.
+  def household_members
+    household ? household.users.order(:id).to_a : [ self ]
+  end
 
   # Gives this user every record that has no owner yet: the data from before there were users.
   # Fills in only, never moves a record from another user. Returns the count per model.

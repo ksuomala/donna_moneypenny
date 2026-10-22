@@ -136,4 +136,36 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     assert_equal [ [ "Käyttötili", 1200, 200 ], [ "EtuTili", nil, nil ] ], rows.map { [ it.name, it.balance, it.change ] }
     assert_equal 1200, stats.account_total
   end
+
+  test "a household combines the members' categories by name and leaves out what moved between them" do
+    other = User.where.not(id: User.owner.id).first
+    their_connection = BankConnection.create!(user: other, session_id: "s2", aspsp_name: "Danske Bank", aspsp_country: "DK", valid_until: 1.month.from_now)
+    their_account = their_connection.bank_accounts.create!(uid: "acc-2", currency: "DKK")
+    their_groceries = TransactionCategory.create!(name: "Groceries", kind: :expense, user: other)
+    their_housing = TransactionCategory.create!(name: "Housing", kind: :expense, user: other)
+    rent_in = TransactionCategory.create!(name: "Rent received", kind: :income)
+    theirs = ->(amount, category, date = Date.new(2026, 10, 5)) do
+      their_account.bank_transactions.create!(entry_reference: SecureRandom.hex(4), status: "booked", occurred_on: date,
+                                              amount: amount, currency: "EUR", transaction_category: category)
+    end
+
+    txn(-100, @groceries)
+    theirs.(-50, their_groceries)
+    # Rent from them to the owner: converted from kroner on their side, so the amounts differ slightly.
+    theirs.(-1355.40, their_housing, Date.new(2026, 10, 2))
+    txn(1350, rent_in, date: Date.new(2026, 10, 4))
+    # Their own rent to a landlord has no other side here and stays.
+    theirs.(-600, their_housing)
+
+    household = BankTransactions::Stats.new(@range, users: [ User.owner, other ])
+    assert household.household?
+    assert_equal [ [ "Housing", 600 ], [ "Groceries", 150 ] ], household.expenses.map { [ it.name, it.amount ] }
+    assert_empty household.incomes
+    assert_equal BigDecimal("1355.40"), household.internal_transfers
+
+    mine = BankTransactions::Stats.new(@range, users: [ User.owner ])
+    assert_not mine.household?
+    assert_equal [ [ "Rent received", 1350 ] ], mine.incomes.map { [ it.name, it.amount ] }
+    assert_equal 0, mine.internal_transfers
+  end
 end

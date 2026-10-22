@@ -20,6 +20,17 @@
       <% end %>
     </div>
 
+    <% if @members.many? %>
+      <div class="quick-filters scope-filter" aria-label="Whose">
+        <% { "me" => "Me", "household" => Current.user.household.name }.each do |scope, label| %>
+          <%= link_to label, stats_path(request.query_parameters.merge(scope: scope)), class: [ "chip", { "chip-active": @scope == scope } ], aria: { current: (@scope == scope ? "true" : nil) } %>
+        <% end %>
+        <% if @scope == "household" && @stats.internal_transfers.positive? %>
+          <span class="muted rate-note">between members, left out: <%= money(@stats.internal_transfers) %></span>
+        <% end %>
+      </div>
+    <% end %>
+
     <div class="quick-filters currency-filter" aria-label="Currency">
       <% DisplayCurrency::CODES.each do |code| %>
         <%= link_to code, stats_path(request.query_parameters.merge(currency: code)), class: [ "chip", { "chip-active": @currency.code == code } ], aria: { current: (@currency.code == code ? "true" : nil) } %>

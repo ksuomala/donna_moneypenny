@@ -80,6 +80,31 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".bar-value", "10,00 €"
   end
 
+  test "members of a household can switch between their own and the combined stats" do
+    get stats_path
+    assert_select ".scope-filter", 0
+
+    household = Household.create!(name: "Us")
+    other = users(:two)
+    [ @user, other ].each { |u| u.update!(household: household) }
+    their_account = other.bank_connections.create!(session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
+      .bank_accounts.create!(uid: "acc-2", currency: "EUR")
+    their_account.bank_transactions.create!(entry_reference: "t", occurred_on: @today, amount: -5, currency: "EUR",
+                                            transaction_category: other.transaction_categories.create!(name: "Groceries", kind: :expense))
+    txn(-10, @today)
+
+    get stats_path(scope: "household")
+    assert_select ".scope-filter .chip-active", "Us"
+    assert_select ".bar-value", "15,00 €"
+
+    get stats_path
+    assert_select ".bar-value", "15,00 €"
+
+    get stats_path(scope: "me")
+    assert_select ".scope-filter .chip-active", "Me"
+    assert_select ".bar-value", "10,00 €"
+  end
+
   test "quick filter for this year" do
     txn(-10, @today.beginning_of_year)
     txn(-20, @today)

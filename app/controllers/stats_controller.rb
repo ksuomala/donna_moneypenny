@@ -8,6 +8,9 @@ class StatsController < ApplicationController
   def show
     session[:stats_currency] = params[:currency] if params[:currency].present?
     @currency = DisplayCurrency.for(session[:stats_currency])
+    session[:stats_scope] = params[:scope] if params[:scope].present?
+    @members = Current.user.household_members
+    @scope = @members.many? && session[:stats_scope] == "household" ? "household" : "me"
     @today = Time.find_zone("Europe/Helsinki").today
     @months = 11.downto(0).map { |ago| @today.beginning_of_month.months_ago(ago) }
     month = parse_month(params[:month])
@@ -20,7 +23,7 @@ class StatsController < ApplicationController
       else
         custom_range
       end
-    @stats = BankTransactions::Stats.new(@range, user: Current.user)
+    @stats = BankTransactions::Stats.new(@range, users: @scope == "household" ? @members : [ Current.user ])
   end
 
   private

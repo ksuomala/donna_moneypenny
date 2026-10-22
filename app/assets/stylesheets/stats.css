@@ -67,7 +67,8 @@
   gap: 0.5rem;
 }
 
-.currency-filter {
+.currency-filter,
+.scope-filter {
   align-items: center;
 }
 

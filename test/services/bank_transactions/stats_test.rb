@@ -167,8 +167,14 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     @account.bank_transactions.create!(entry_reference: "gift", status: "booked", occurred_on: Date.new(2026, 10, 6), amount: 20,
                                        currency: "EUR", counterparty_name: "A Friend")
 
+    from_them = Loan.create!(name: "Loan from Alex", creditor: "Alex Example")
+    from_them.bank_transactions << txn(2000, loans)
+    from_parents = Loan.create!(name: "Car loan", creditor: "Alex's parents")
+    from_parents.bank_transactions << txn(5000, loans)
+
     household = BankTransactions::Stats.new(@range, users: [ User.owner, other ])
     assert household.household?
+    assert_equal [ "Car loan" ], household.loans.map(&:name)
     assert_equal [ [ "Housing", 600 ], [ "Groceries", 150 ] ], household.expenses.map { [ it.name, it.amount ] }
     assert_equal [ [ "Uncategorized", 20 ] ], household.incomes.map { [ it.name, it.amount ] }
     assert_equal BigDecimal("1997.40"), household.internal_transfers
@@ -177,6 +183,7 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     assert_not mine.household?
     assert_equal [ [ "Groceries", 100 ] ], mine.expenses.map { [ it.name, it.amount ] }
     assert_equal 0, mine.internal_transfers
+    assert_equal [ "Car loan", "Loan from Alex" ], mine.loans.map(&:name)
     theirs_only = BankTransactions::Stats.new(@range, users: [ other ])
     assert_equal [ [ "Housing", BigDecimal("2062.40") ], [ "Groceries", 50 ] ], theirs_only.expenses.map { [ it.name, it.amount ] }
   end

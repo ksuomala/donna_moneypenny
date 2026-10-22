@@ -142,8 +142,12 @@ module BankTransactions
       end
     end
 
+    # In a household, a loan from one member to another (the creditor is another member, by
+    # their aliases) is money inside the household and is left out.
     def loan_rows
       Loan.where(user: users).order(:name).filter_map do |loan|
+        next if household? && HouseholdAlias.match?(loan.creditor, HouseholdAlias.where(user: users - [ loan.user ]).pluck(:name))
+
         balance = loan.balance_on(range.end)
         before = loan.balance_on(range.begin - 1)
         moved = loan.bank_transactions.booked.where(occurred_on: range)

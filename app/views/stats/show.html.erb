@@ -14,9 +14,18 @@
   </nav>
 
   <div class="stats-filters">
-    <div class="quick-filters">
+    <div class="quick-filters period-filters">
       <% { "week" => "This week", "month" => "This month", "year" => "This year" }.each do |period, label| %>
         <%= link_to label, stats_path(period: period), class: [ "chip", { "chip-active": @period == period } ], aria: { current: (@period == period ? "true" : nil) } %>
+      <% end %>
+    </div>
+
+    <div class="quick-filters currency-filter" aria-label="Currency">
+      <% DisplayCurrency::CODES.each do |code| %>
+        <%= link_to code, stats_path(request.query_parameters.merge(currency: code)), class: [ "chip", { "chip-active": @currency.code == code } ], aria: { current: (@currency.code == code ? "true" : nil) } %>
+      <% end %>
+      <% unless @currency.euros? %>
+        <span class="muted rate-note">1 € = <%= number_with_precision(@currency.rate, precision: 4, separator: ",") %> <%= @currency.unit %> (ECB, <%= l @currency.on, format: :long %>)</span>
       <% end %>
     </div>
 
@@ -30,15 +39,15 @@
   <div class="stat-tiles">
     <div class="stat-tile">
       <span class="muted">Income</span>
-      <strong><%= euros(@stats.income_total) %></strong>
+      <strong><%= money(@stats.income_total) %></strong>
     </div>
     <div class="stat-tile">
       <span class="muted">Expenses</span>
-      <strong><%= euros(@stats.expense_total) %></strong>
+      <strong><%= money(@stats.expense_total) %></strong>
     </div>
     <div class="stat-tile">
       <span class="muted">Net</span>
-      <strong><%= euros(@stats.net) %></strong>
+      <strong><%= money(@stats.net) %></strong>
     </div>
   </div>
 

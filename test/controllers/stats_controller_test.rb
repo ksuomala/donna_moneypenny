@@ -48,6 +48,38 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     assert_select "svg.pie path.pie-slice", 1
   end
 
+  test "amounts can be shown in Danish kroner at today's ECB rate, remembered for the next page" do
+    ExchangeRate.create!(currency: "DKK", on: Date.current, rate: "7.4600")
+    txn(-10, @today)
+    @account.balances.create!(on: @today, booked: 100)
+
+    get stats_path(currency: "DKK")
+
+    assert_response :success
+    assert_select ".currency-filter .chip-active", "DKK"
+    assert_select ".rate-note", /1 € = 7,4600 kr\./
+    assert_select ".bar-value", "74,60 kr."
+    assert_select "table.accounts td.number", text: "746,00 kr.", minimum: 1
+
+    get stats_path
+    assert_select ".bar-value", "74,60 kr."
+
+    get stats_path(currency: "EUR")
+    assert_select ".bar-value", "10,00 €"
+  end
+
+  test "an unknown currency or one without a rate falls back to euros" do
+    txn(-10, @today)
+
+    get stats_path(currency: "XXX")
+    assert_select ".bar-value", "10,00 €"
+
+    get stats_path(currency: "DKK")
+    assert_response :success
+    assert_select ".currency-filter .chip-active", "EUR"
+    assert_select ".bar-value", "10,00 €"
+  end
+
   test "quick filter for this year" do
     txn(-10, @today.beginning_of_year)
     txn(-20, @today)
@@ -64,7 +96,7 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
 
     get stats_path(from: "2026-01-01", to: "2026-02-28")
 
-    assert_select ".chip-active", 0
+    assert_select ".period-filters .chip-active", 0
     assert_select ".bar-value", "10,00 €"
     assert_select "input[name=from][value='2026-01-01']"
   end
@@ -94,7 +126,7 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".month-tab:first-child", month.strftime("%b %y")
     assert_select ".month-tab:last-child", @today.strftime("%b %y")
     assert_select ".month-tab-active", month.strftime("%b %y")
-    assert_select ".chip-active", 0
+    assert_select ".period-filters .chip-active", 0
     assert_select ".bar-value", "10,00 €"
   end
 

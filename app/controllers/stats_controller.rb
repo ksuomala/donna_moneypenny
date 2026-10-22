@@ -3,8 +3,11 @@ class StatsController < ApplicationController
 
   # Defaults to this month. Quick filters pass ?period=week|month|year, the month tabs
   # ?month=YYYY-MM, and the timeline form ?from=&to= (either end may be left open-ended to
-  # today / the start of the month).
+  # today / the start of the month). ?currency=DKK shows the amounts in another currency and
+  # is remembered in the session.
   def show
+    session[:stats_currency] = params[:currency] if params[:currency].present?
+    @currency = DisplayCurrency.for(session[:stats_currency])
     @today = Time.find_zone("Europe/Helsinki").today
     @months = 11.downto(0).map { |ago| @today.beginning_of_month.months_ago(ago) }
     month = parse_month(params[:month])

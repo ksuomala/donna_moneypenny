@@ -67,6 +67,14 @@
   gap: 0.5rem;
 }
 
+.currency-filter {
+  align-items: center;
+}
+
+.rate-note {
+  font-size: 0.85rem;
+}
+
 .chip {
   padding: 0.3rem 0.8rem;
   border: 1px solid var(--hairline);

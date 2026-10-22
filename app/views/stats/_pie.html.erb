@@ -11,7 +11,7 @@
         <li>
           <span class="swatch series-<%= part.color %>"></span>
           <span class="legend-name"><%= part.name %></span>
-          <span class="legend-value"><%= euros(part.amount) %> <span class="muted"><%= share(part.amount, total) %></span></span>
+          <span class="legend-value"><%= money(part.amount) %> <span class="muted"><%= share(part.amount, total) %></span></span>
         </li>
       <% end %>
     </ul>

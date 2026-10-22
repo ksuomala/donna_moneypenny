@@ -1,5 +1,5 @@
 <section class="stats-section">
-  <h2>Accounts <span class="muted"><%= euros(total) %></span></h2>
+  <h2>Accounts <span class="muted"><%= money(total) %></span></h2>
 
   <% if rows.empty? %>
     <p class="muted">No accounts.</p>
@@ -17,15 +17,15 @@
           <% rows.each do |row| %>
             <tr>
               <th scope="row"><%= row.name %></th>
-              <td class="number"><%= row.balance ? euros(row.balance) : tag.span("unknown", class: "muted") %></td>
-              <td class="number"><%= row.change ? signed_euros(row.change) : tag.span("–", class: "muted") %></td>
+              <td class="number"><%= row.balance ? money(row.balance) : tag.span("unknown", class: "muted") %></td>
+              <td class="number"><%= row.change ? signed_money(row.change) : tag.span("–", class: "muted") %></td>
             </tr>
           <% end %>
         </tbody>
         <tfoot>
           <tr>
             <th scope="row">Total</th>
-            <td class="number"><%= euros(total) %></td>
+            <td class="number"><%= money(total) %></td>
             <td></td>
           </tr>
         </tfoot>

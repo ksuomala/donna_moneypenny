@@ -87,22 +87,25 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     household = Household.create!(name: "Us")
     other = users(:two)
     [ @user, other ].each { |u| u.update!(household: household) }
+    other.household_aliases.create!(name: "User Two")
     their_account = other.bank_connections.create!(session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
       .bank_accounts.create!(uid: "acc-2", currency: "EUR")
     their_account.bank_transactions.create!(entry_reference: "t", occurred_on: @today, amount: -5, currency: "EUR",
                                             transaction_category: other.transaction_categories.create!(name: "Groceries", kind: :expense))
     txn(-10, @today)
+    txn(-500, @today).update!(counterparty_name: "USER TWO")
 
     get stats_path(scope: "household")
     assert_select ".scope-filter .chip-active", "Us"
     assert_select ".bar-value", "15,00 €"
+    assert_select ".scope-filter .rate-note", /between members, left out: 500,00 €/
 
     get stats_path
     assert_select ".bar-value", "15,00 €"
 
     get stats_path(scope: "me")
     assert_select ".scope-filter .chip-active", "Me"
-    assert_select ".bar-value", "10,00 €"
+    assert_select ".bar-value", "510,00 €"
   end
 
   test "quick filter for this year" do

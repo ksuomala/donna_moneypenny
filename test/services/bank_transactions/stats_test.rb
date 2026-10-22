@@ -137,47 +137,43 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     assert_equal 1200, stats.account_total
   end
 
-  test "a household combines the members' categories by name and leaves out what moved between them" do
+  test "a household combines the members' categories by name and leaves out payments between them" do
     other = User.where.not(id: User.owner.id).first
     their_connection = BankConnection.create!(user: other, session_id: "s2", aspsp_name: "Danske Bank", aspsp_country: "DK", valid_until: 1.month.from_now)
-    their_account = their_connection.bank_accounts.create!(uid: "acc-2", currency: "DKK", raw: { "name" => "Alex Example" })
-    @account.update!(raw: { "name" => "EXAMPLE OWNER" })
+    their_account = their_connection.bank_accounts.create!(uid: "acc-2", currency: "DKK")
     their_groceries = TransactionCategory.create!(name: "Groceries", kind: :expense, user: other)
     their_housing = TransactionCategory.create!(name: "Housing", kind: :expense, user: other)
-    rent_in = TransactionCategory.create!(name: "Rent received", kind: :income)
-    theirs = ->(amount, category, date = Date.new(2026, 10, 5), counterparty = nil) do
-      their_account.bank_transactions.create!(entry_reference: SecureRandom.hex(4), status: "booked", occurred_on: date,
+    loans = TransactionCategory.create!(name: "Loans", exclude_from_stats: true)
+    User.owner.household_aliases.create!(name: "Owner Example")
+    other.household_aliases.create!(name: "Alex Example")
+    theirs = ->(amount, category, counterparty = nil) do
+      their_account.bank_transactions.create!(entry_reference: SecureRandom.hex(4), status: "booked", occurred_on: Date.new(2026, 10, 5),
                                               amount: amount, currency: "EUR", transaction_category: category, counterparty_name: counterparty)
     end
 
     txn(-100, @groceries)
     theirs.(-50, their_groceries)
-    # Rent from them to the owner: converted from kroner on their side, so the amounts differ slightly.
-    theirs.(-1355.40, their_housing, Date.new(2026, 10, 2), "OWNER EXAMPLE")
-    @account.bank_transactions.create!(entry_reference: "rent", status: "booked", occurred_on: Date.new(2026, 10, 4), amount: 1350,
-                                       currency: "EUR", transaction_category: rent_in, counterparty_name: "ALEX EXAMPLE")
-    # A deposit of the owner's own within the window names nobody else: not the rent's other side.
-    @account.bank_transactions.create!(entry_reference: "own-in", status: "booked", occurred_on: Date.new(2026, 10, 3), amount: 1340,
-                                       currency: "EUR", counterparty_name: "Owner Example")
-    # Their own rent to a landlord has no other side here and stays.
-    theirs.(-600, their_housing, Date.new(2026, 10, 5), "Landlord")
-    # The same amount the other way round by coincidence, naming nobody in the household: not a transfer.
-    theirs.(-20, their_groceries, Date.new(2026, 10, 6), "Pharmacy")
+    # Rent from them to the owner: Housing on their side, a hidden loan on the owner's. Out of the household either way.
+    theirs.(-1355.40, their_housing, "OWNER EXAMPLE")
+    txn(1350, loans).update!(counterparty_name: "ALEX EXAMPLE")
+    # A payment to the owner's account at a bank that isn't connected: only their side exists, still out.
+    theirs.(-642, their_housing, "Owner Example lunar")
+    # Their own rent to a landlord stays, and so does an uncategorized gift from someone else.
+    theirs.(-600, their_housing, "Landlord")
     @account.bank_transactions.create!(entry_reference: "gift", status: "booked", occurred_on: Date.new(2026, 10, 6), amount: 20,
                                        currency: "EUR", counterparty_name: "A Friend")
-    # An own transfer of theirs is out of the stats already and must not pair with the owner's spending.
-    theirs.(500, @own, Date.new(2026, 10, 7), "Alex Example")
-    txn(-500, @groceries, date: Date.new(2026, 10, 8))
 
     household = BankTransactions::Stats.new(@range, users: [ User.owner, other ])
     assert household.household?
-    assert_equal [ [ "Groceries", 670 ], [ "Housing", 600 ] ], household.expenses.map { [ it.name, it.amount ] }
-    assert_equal [ [ "Uncategorized", 1360 ] ], household.incomes.map { [ it.name, it.amount ] }
-    assert_equal BigDecimal("1355.40"), household.internal_transfers
+    assert_equal [ [ "Housing", 600 ], [ "Groceries", 150 ] ], household.expenses.map { [ it.name, it.amount ] }
+    assert_equal [ [ "Uncategorized", 20 ] ], household.incomes.map { [ it.name, it.amount ] }
+    assert_equal BigDecimal("1997.40"), household.internal_transfers
 
     mine = BankTransactions::Stats.new(@range, users: [ User.owner ])
     assert_not mine.household?
-    assert_equal [ [ "Uncategorized", 1360 ], [ "Rent received", 1350 ] ], mine.incomes.map { [ it.name, it.amount ] }
+    assert_equal [ [ "Groceries", 100 ] ], mine.expenses.map { [ it.name, it.amount ] }
     assert_equal 0, mine.internal_transfers
+    theirs_only = BankTransactions::Stats.new(@range, users: [ other ])
+    assert_equal [ [ "Housing", BigDecimal("2597.40") ], [ "Groceries", 50 ] ], theirs_only.expenses.map { [ it.name, it.amount ] }
   end
 end

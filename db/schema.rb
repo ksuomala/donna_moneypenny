@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_23_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_23_110000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -196,6 +196,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_100000) do
     t.index ["user_id"], name: "index_expenses_on_user_id"
   end
 
+  create_table "household_aliases", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "name"], name: "index_household_aliases_on_user_id_and_name", unique: true
+    t.index ["user_id"], name: "index_household_aliases_on_user_id"
+  end
+
   create_table "households", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "name", null: false
     t.datetime "created_at", null: false
@@ -294,6 +303,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_100000) do
   add_foreign_key "categorization_runs", "users"
   add_foreign_key "enable_banking_apps", "users"
   add_foreign_key "expenses", "users"
+  add_foreign_key "household_aliases", "users"
   add_foreign_key "incomes", "users"
   add_foreign_key "loan_balances", "loans"
   add_foreign_key "loans", "users"

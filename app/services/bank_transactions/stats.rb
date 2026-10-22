@@ -1,9 +1,9 @@
 module BankTransactions
   # A user's totals per category for a date range, split into incomes and expenses. With
   # several users (a household) the totals are combined: categories with the same name and
-  # kind merge into one slice, and money that moved between the members (the same amount the
-  # other way round on another member's account within a few days, e.g. rent paid to each
-  # other) is left out of both sides.
+  # kind merge into one slice, and money that moved between the members (any transaction
+  # whose counterparty is another member, by the names in HouseholdAlias, e.g. rent paid to
+  # each other) is left out whatever its category on either side.
   #
   # Expense and income categories show their totals as positive amounts (refunds reduce an
   # expense). Each investment sub-category is netted into one figure: rent 1000 minus vastike 280
@@ -30,11 +30,6 @@ module BankTransactions
     # balance is the account's balance at the end of the range and change how much it moved
     # during it (nil when we don't know).
     AccountRow = Data.define(:name, :balance, :change)
-
-    # How far apart the two sides of a transfer between members may be booked, and how much
-    # their amounts may differ (a transfer in another currency is converted at its own day's rate).
-    TRANSFER_WINDOW = 5
-    TRANSFER_TOLERANCE = BigDecimal("0.02")
 
     attr_reader :range, :users
 
@@ -97,52 +92,16 @@ module BankTransactions
       household? ? all.where.not(id: internal_transfer_ids) : all
     end
 
-    # Transactions that have their other side on another member's account: the same amount
-    # (within the tolerance) the other way round within the window, where each side names the
-    # other member (the counterparty shares a name with the holder of the other member's
-    # accounts, as the banks report it, that the holder of its own side does not have: a shared
-    # surname names nobody in particular). Rows in categories left out of the stats don't pair:
-    # they are out already and must not use up a partner. Each row pairs at most once.
+    # Transactions whose counterparty is another member of the household, by that member's
+    # aliases: payments between members, whichever side and whatever the category.
     def internal_transfer_ids
-      @internal_transfer_ids ||= begin
-        rows_by_user = users.to_h do |u|
-          [ u.id, countable.where(bank_account_id: u.bank_accounts.select(:id)).where.not(amount: 0).pluck(:id, :occurred_on, :amount, :counterparty_name) ]
-        end
-        holders = users.to_h { |u| [ u.id, holder_tokens(u) ] }
-        paired = Set.new
-        rows_by_user.each do |user_id, rows|
-          others = rows_by_user.except(user_id).flat_map { |other_id, other_rows| other_rows.map { |row| [ other_id, *row ] } }
-          rows.each do |id, on, amount, counterparty|
-            next if paired.include?(id)
+      @internal_transfer_ids ||= users.flat_map do |member|
+        others = HouseholdAlias.where(user: users - [ member ]).pluck(:name)
+        next [] if others.empty?
 
-            match = others.find do |other_user_id, other_id, other_on, other_amount, other_counterparty|
-              !paired.include?(other_id) && (other_on - on).abs <= TRANSFER_WINDOW &&
-                (other_amount + amount).abs <= amount.abs * TRANSFER_TOLERANCE &&
-                names?(counterparty, holders[other_user_id] - holders[user_id]) && names?(other_counterparty, holders[user_id] - holders[other_user_id])
-            end
-            paired << id << match[1] if match
-          end
-        end
-        paired.to_a
+        all.where(bank_account_id: member.bank_accounts.select(:id)).where.not(counterparty_name: [ nil, "" ])
+          .pluck(:id, :counterparty_name).filter_map { |id, counterparty| id if HouseholdAlias.match?(counterparty, others) }
       end
-    end
-
-    # The rows that count in the stats: uncategorized or in a category that isn't excluded.
-    def countable
-      all.left_joins(:transaction_category).where(transaction_categories: { id: nil }).or(all.left_joins(:transaction_category).merge(TransactionCategory.in_stats))
-    end
-
-    # The words of the account holder names the banks report for a user's accounts.
-    def holder_tokens(user)
-      user.bank_accounts.filter_map { |account| account.raw&.dig("name") }.flat_map { |name| name_tokens(name) }.to_set
-    end
-
-    def names?(counterparty, tokens)
-      counterparty.present? && tokens.intersect?(name_tokens(counterparty))
-    end
-
-    def name_tokens(name)
-      name.to_s.downcase.scan(/[[:alpha:]]{3,}/)
     end
 
     def slices

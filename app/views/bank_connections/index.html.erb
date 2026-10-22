@@ -9,7 +9,11 @@
   <% if alert %><p class="flash flash-alert"><%= alert %></p><% end %>
 
   <% if Current.user.enable_banking_app&.configured? %>
-    <%= button_to "Connect Nordea", enable_banking_authorization_path, class: "button", data: { turbo: false } %>
+    <div class="connect-buttons">
+      <% EnableBanking::Bank.all.each do |bank| %>
+        <%= button_to "Connect #{bank.name}", enable_banking_authorization_path, params: { bank: bank.key }, class: "button", data: { turbo: false } %>
+      <% end %>
+    </div>
   <% else %>
     <p>To connect a bank, first <%= link_to "set up your Enable Banking application", enable_banking_app_path %>.</p>
   <% end %>

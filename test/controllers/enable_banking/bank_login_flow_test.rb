@@ -23,7 +23,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     get root_path
     assert_redirected_to new_session_path
 
-    post enable_banking_authorization_path
+    post enable_banking_authorization_path, params: { bank: "nordea" }
     assert_redirected_to new_session_path
 
     get enable_banking_callback_path(@app.callback_token), params: { code: "x", state: "y" }
@@ -37,7 +37,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     fake = EnableBanking::FakeClient.new
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path
+      post enable_banking_authorization_path, params: { bank: "nordea" }
     end
 
     assert_redirected_to "https://bank.example/authorize?id=123"
@@ -50,11 +50,42 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     assert_in_delta 180.days.from_now, args[:valid_until], 2.hours
   end
 
+  test "connect offers every supported bank and sends the chosen one to Enable Banking" do
+    get root_path
+    assert_select "form[action=?] input[name=bank][value=nordea]", enable_banking_authorization_path
+    assert_select "form[action=?] input[name=bank][value=revolut]", enable_banking_authorization_path
+
+    fake = EnableBanking::FakeClient.new
+
+    with_enable_banking_client(fake) do
+      post enable_banking_authorization_path, params: { bank: "revolut" }
+    end
+
+    assert_redirected_to "https://bank.example/authorize?id=123"
+    _, args = fake.calls.assoc(:start_authorization)
+    assert_equal "Revolut", args[:aspsp_name]
+    assert_equal "LT", args[:country]
+    assert_equal [ :aspsps, "LT" ], fake.calls.assoc(:aspsps)
+  end
+
+  test "connect refuses a bank that is not offered" do
+    fake = EnableBanking::FakeClient.new
+
+    with_enable_banking_client(fake) do
+      post enable_banking_authorization_path, params: { bank: "monzo" }
+      post enable_banking_authorization_path
+    end
+
+    assert_redirected_to root_path
+    assert_equal "Unknown bank.", flash[:alert]
+    assert_empty fake.calls
+  end
+
   test "callback stores the connection and its accounts" do
     fake = EnableBanking::FakeClient.new(session_data: SESSION_DATA)
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path
+      post enable_banking_authorization_path, params: { bank: "nordea" }
       state = session[:enable_banking_state]
 
       assert_difference -> { BankConnection.count } => 1, -> { BankAccount.count } => 2 do
@@ -83,7 +114,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     fake = EnableBanking::FakeClient.new(session_data: SESSION_DATA)
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path
+      post enable_banking_authorization_path, params: { bank: "nordea" }
 
       assert_no_difference -> { BankConnection.count } do
         get enable_banking_callback_path(@app.callback_token), params: { code: "the-code", state: "forged" }
@@ -98,7 +129,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     @app.destroy!
 
     with_enable_banking_client(EnableBanking::FakeClient.new) do
-      post enable_banking_authorization_path
+      post enable_banking_authorization_path, params: { bank: "nordea" }
     end
 
     assert_redirected_to enable_banking_app_path
@@ -109,7 +140,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     fake = EnableBanking::FakeClient.new(session_data: SESSION_DATA)
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path
+      post enable_banking_authorization_path, params: { bank: "nordea" }
       state = session[:enable_banking_state]
 
       assert_no_difference -> { BankConnection.count } do
@@ -184,7 +215,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     fake = EnableBanking::FakeClient.new(error: EnableBanking::Client::Error.new("boom"))
 
     with_enable_banking_client(fake) do
-      post enable_banking_authorization_path
+      post enable_banking_authorization_path, params: { bank: "nordea" }
     end
 
     assert_redirected_to root_path

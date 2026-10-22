@@ -33,7 +33,7 @@ module EnableBanking
 
     # A signed request proves the ID and key belong together and the app is active.
     def credentials_accepted?
-      @app.client.aspsps(country: AuthorizationsController::ASPSP_COUNTRY)
+      @app.client.aspsps(country: Bank.all.first.country)
       true
     rescue EnableBanking::Client::Error => e
       @app.errors.add(:base, "Enable Banking did not accept these credentials: #{e.message}")

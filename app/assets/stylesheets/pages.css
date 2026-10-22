@@ -58,6 +58,12 @@
   margin-left: 1rem;
 }
 
+.connect-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .page-nav .link-button {
   padding: 0;
   border: 0;

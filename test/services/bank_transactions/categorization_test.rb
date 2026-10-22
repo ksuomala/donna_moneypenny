@@ -160,7 +160,7 @@ class BankTransactions::CategorizationTest < ActiveSupport::TestCase
     context = BankTransactions::Categorization.context(user: User.owner)
     assert_not_includes context, "Rent"
     assert_not_includes context, "Landlord"
-    assert_not_includes BankTransactions::Categorization.uncategorized(user: User.owner), their_transaction.id.to_s
+    assert_no_match(/^#{their_transaction.id}\t/, BankTransactions::Categorization.uncategorized(user: User.owner))
 
     assert_raises(ArgumentError) { BankTransactions::Categorization.apply({ mine.id => their_rent.id }, user: User.owner) }
     result = BankTransactions::Categorization.apply({ their_transaction.id => @groceries.id, mine.id => @groceries.id }, user: User.owner)

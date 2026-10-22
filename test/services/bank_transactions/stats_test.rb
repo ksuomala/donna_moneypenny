@@ -154,7 +154,11 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     theirs.(-50, their_groceries)
     # Rent from them to the owner: converted from kroner on their side, so the amounts differ slightly.
     theirs.(-1355.40, their_housing, Date.new(2026, 10, 2), "OWNER EXAMPLE")
-    txn(1350, rent_in, date: Date.new(2026, 10, 4))
+    @account.bank_transactions.create!(entry_reference: "rent", status: "booked", occurred_on: Date.new(2026, 10, 4), amount: 1350,
+                                       currency: "EUR", transaction_category: rent_in, counterparty_name: "ALEX EXAMPLE")
+    # A deposit of the owner's own within the window names nobody else: not the rent's other side.
+    @account.bank_transactions.create!(entry_reference: "own-in", status: "booked", occurred_on: Date.new(2026, 10, 3), amount: 1340,
+                                       currency: "EUR", counterparty_name: "Owner Example")
     # Their own rent to a landlord has no other side here and stays.
     theirs.(-600, their_housing, Date.new(2026, 10, 5), "Landlord")
     # The same amount the other way round by coincidence, naming nobody in the household: not a transfer.
@@ -168,12 +172,12 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     household = BankTransactions::Stats.new(@range, users: [ User.owner, other ])
     assert household.household?
     assert_equal [ [ "Groceries", 670 ], [ "Housing", 600 ] ], household.expenses.map { [ it.name, it.amount ] }
-    assert_equal [ [ "Uncategorized", 20 ] ], household.incomes.map { [ it.name, it.amount ] }
+    assert_equal [ [ "Uncategorized", 1360 ] ], household.incomes.map { [ it.name, it.amount ] }
     assert_equal BigDecimal("1355.40"), household.internal_transfers
 
     mine = BankTransactions::Stats.new(@range, users: [ User.owner ])
     assert_not mine.household?
-    assert_equal [ [ "Rent received", 1350 ], [ "Uncategorized", 20 ] ], mine.incomes.map { [ it.name, it.amount ] }
+    assert_equal [ [ "Uncategorized", 1360 ], [ "Rent received", 1350 ] ], mine.incomes.map { [ it.name, it.amount ] }
     assert_equal 0, mine.internal_transfers
   end
 end

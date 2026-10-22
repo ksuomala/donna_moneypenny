@@ -98,7 +98,7 @@ module BankTransactions
     end
 
     # Transactions that have their other side on another member's account: the same amount
-    # (within the tolerance) the other way round within the window, where one side names the
+    # (within the tolerance) the other way round within the window, where each side names the
     # other member (the counterparty shares a name with the holder of the other member's
     # accounts, as the banks report it). Rows in categories left out of the stats don't pair:
     # they are out already and must not use up a partner. Each row pairs at most once.
@@ -117,7 +117,7 @@ module BankTransactions
             match = others.find do |other_user_id, other_id, other_on, other_amount, other_counterparty|
               !paired.include?(other_id) && (other_on - on).abs <= TRANSFER_WINDOW &&
                 (other_amount + amount).abs <= amount.abs * TRANSFER_TOLERANCE &&
-                (names?(counterparty, holders[other_user_id]) || names?(other_counterparty, holders[user_id]))
+                names?(counterparty, holders[other_user_id]) && names?(other_counterparty, holders[user_id])
             end
             paired << id << match[1] if match
           end

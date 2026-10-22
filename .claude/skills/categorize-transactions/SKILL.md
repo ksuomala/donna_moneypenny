@@ -67,6 +67,11 @@ bin/kamal app exec --reuse 'bin/rails bank:sync'
 bin/kamal app exec --reuse 'bin/rails accounts:balances'
 ```
 
+Every task above works on the owner's data. For another user's transactions and categories, add
+`EMAIL=their@address` to the command: the listings, `categorize`, `link_loans` and the
+`categories:*` tasks then act for that user, whose categories are their own (the nightly
+categorizer and the rules still run only for the owner).
+
 `categorize` and `link_loans` only fill in what's missing. It skips transactions that already have one
 (including ones the user set by hand) and pending ones (the sync replaces those every day).
 It refuses unknown categories and categories that have sub-categories.

@@ -11,6 +11,7 @@
   --series-6: #008300;
   --series-7: #4a3aa7;
   --series-8: #e34948;
+  --series-9: #0e9aa7;
   --series-other: #9ca3af;
   --series-uncategorized: #4b5563;
 }
@@ -286,6 +287,7 @@
 .series-6 { fill: var(--series-6); background: var(--series-6); }
 .series-7 { fill: var(--series-7); background: var(--series-7); }
 .series-8 { fill: var(--series-8); background: var(--series-8); }
+.series-9 { fill: var(--series-9); background: var(--series-9); }
 .series-other { fill: var(--series-other); background: var(--series-other); }
 .series-uncategorized { fill: var(--series-uncategorized); background: var(--series-uncategorized); }
 

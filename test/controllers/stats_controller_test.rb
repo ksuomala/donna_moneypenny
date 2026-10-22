@@ -129,8 +129,8 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name=from][value='2026-01-01']"
   end
 
-  test "pie folds the smallest categories into Other past eight" do
-    9.times do |i|
+  test "pie folds the smallest categories into Other past nine" do
+    10.times do |i|
       category = @user.transaction_categories.create!(name: "Category #{i}", kind: :expense)
       @account.bank_transactions.create!(entry_reference: "r#{i}", occurred_on: @today, amount: -(i + 1),
                                          currency: "EUR", transaction_category: category)
@@ -138,8 +138,8 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
 
     get stats_path
 
-    assert_select ".bar-row", 9
-    assert_select "svg.pie path.pie-slice", 8
+    assert_select ".bar-row", 10
+    assert_select "svg.pie path.pie-slice", 9
     assert_select ".legend li", text: /Other\s+3,00 €/
   end
 

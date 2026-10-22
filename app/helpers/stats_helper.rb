@@ -1,6 +1,6 @@
 module StatsHelper
-  # The pie palette has eight colors; past that the smallest categories fold into "Other".
-  PIE_COLORS = 8
+  # The pie palette has nine colors; past that the smallest categories fold into "Other".
+  PIE_COLORS = 9
 
   PieSlice = Data.define(:name, :amount, :color)
 

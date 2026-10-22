@@ -4,7 +4,8 @@ module EnableBanking
   class Bank < Data.define(:key, :name, :country)
     ALL = [
       new(key: "nordea", name: "Nordea", country: "FI"),
-      new(key: "revolut", name: "Revolut", country: "LT")
+      new(key: "revolut", name: "Revolut", country: "LT"),
+      new(key: "danske", name: "Danske Bank", country: "DK")
     ].freeze
 
     def self.all = ALL

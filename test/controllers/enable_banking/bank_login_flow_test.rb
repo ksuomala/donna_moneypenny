@@ -54,6 +54,7 @@ class EnableBanking::BankLoginFlowTest < ActionDispatch::IntegrationTest
     get root_path
     assert_select "form[action=?] input[name=bank][value=nordea]", enable_banking_authorization_path
     assert_select "form[action=?] input[name=bank][value=revolut]", enable_banking_authorization_path
+    assert_select "form[action=?] input[name=bank][value=danske]", enable_banking_authorization_path
 
     fake = EnableBanking::FakeClient.new
 

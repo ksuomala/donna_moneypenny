@@ -48,11 +48,11 @@ namespace :accounts do
                account.balance_on(on)&.to_s("F") || "unknown" ].join("\t")
       end
     else
-      puts "# id, name, kind, snapshot date, booked, available, credit limit"
+      puts "# id, name, kind, snapshot date, booked, booked type, available, available type, credit limit"
       BankAccount.order(:id).each do |account|
         latest = account.balances.order(:on).last
         puts [ account.id, account.display_name, account.credit_card? ? "credit card" : "account",
-               latest&.on, latest&.booked&.to_s("F") || "unknown", latest&.available&.to_s("F"),
+               latest&.on, latest&.booked&.to_s("F") || "unknown", latest&.booked_type, latest&.available&.to_s("F"), latest&.available_type,
                (account.credit_limit&.to_s("F") if account.credit_card?) ].join("\t")
       end
     end

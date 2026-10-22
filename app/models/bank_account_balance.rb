@@ -1,6 +1,7 @@
 # An account's balances as the bank reported them on a day: one row per account per day,
 # recorded by the daily sync. Booked is signed the bank's way, positive for money in a
-# current account and negative for money owed on a credit card.
+# current account and negative for money owed on a credit card. booked_type and
+# available_type say which of the bank's balance types each amount came from.
 class BankAccountBalance < ApplicationRecord
   belongs_to :bank_account
 
@@ -23,7 +24,9 @@ class BankAccountBalance < ApplicationRecord
 
     {
       booked: BigDecimal(booked.dig("balance_amount", "amount").to_s),
+      booked_type: booked["balance_type"],
       available: available && BigDecimal(available.dig("balance_amount", "amount").to_s),
+      available_type: available && available["balance_type"],
       raw: balances
     }
   end

@@ -7,7 +7,9 @@ class BankAccountBalanceTest < ActiveSupport::TestCase
     attributes = BankAccountBalance.attributes_from_api([ balance("CLBD", "100.00"), balance("ITBD", "-2345.67"), balance("ITAV", "2654.33"), balance("CLAV", "1.00") ])
 
     assert_equal BigDecimal("-2345.67"), attributes[:booked]
+    assert_equal "ITBD", attributes[:booked_type]
     assert_equal BigDecimal("2654.33"), attributes[:available]
+    assert_equal "ITAV", attributes[:available_type]
     assert_equal 4, attributes[:raw].size
   end
 
@@ -15,7 +17,9 @@ class BankAccountBalanceTest < ActiveSupport::TestCase
     attributes = BankAccountBalance.attributes_from_api([ balance("CLBD", "100.00"), balance("OTHR", "5.00") ])
 
     assert_equal BigDecimal("100.00"), attributes[:booked]
+    assert_equal "CLBD", attributes[:booked_type]
     assert_nil attributes[:available]
+    assert_nil attributes[:available_type]
   end
 
   test "an available balance alone stands in for the booked one" do
@@ -23,6 +27,7 @@ class BankAccountBalanceTest < ActiveSupport::TestCase
 
     assert_equal BigDecimal("100.00"), attributes[:booked]
     assert_equal BigDecimal("100.00"), attributes[:available]
+    assert_equal %w[ITAV ITAV], attributes.values_at(:booked_type, :available_type)
   end
 
   test "is nothing without a booked or available balance" do

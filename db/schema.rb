@@ -10,12 +10,14 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_200000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
     t.decimal "booked", precision: 12, scale: 2, null: false
+    t.string "booked_type"
     t.decimal "available", precision: 12, scale: 2
+    t.string "available_type"
     t.json "raw"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false

@@ -98,24 +98,50 @@ module BankTransactions
     end
 
     # Transactions that have their other side on another member's account: the same amount
-    # (within the tolerance) the other way round within the window. Each row pairs at most once.
+    # (within the tolerance) the other way round within the window, where one side names the
+    # other member (the counterparty shares a name with the holder of the other member's
+    # accounts, as the banks report it). Rows in categories left out of the stats don't pair:
+    # they are out already and must not use up a partner. Each row pairs at most once.
     def internal_transfer_ids
       @internal_transfer_ids ||= begin
-        rows_by_user = users.to_h { |u| [ u.id, all.where(bank_account_id: u.bank_accounts.select(:id)).where.not(amount: 0).pluck(:id, :occurred_on, :amount) ] }
+        rows_by_user = users.to_h do |u|
+          [ u.id, countable.where(bank_account_id: u.bank_accounts.select(:id)).where.not(amount: 0).pluck(:id, :occurred_on, :amount, :counterparty_name) ]
+        end
+        holders = users.to_h { |u| [ u.id, holder_tokens(u) ] }
         paired = Set.new
         rows_by_user.each do |user_id, rows|
-          others = rows_by_user.except(user_id).values.flatten(1)
-          rows.each do |id, on, amount|
+          others = rows_by_user.except(user_id).flat_map { |other_id, other_rows| other_rows.map { |row| [ other_id, *row ] } }
+          rows.each do |id, on, amount, counterparty|
             next if paired.include?(id)
 
-            match = others.find do |other_id, other_on, other_amount|
-              !paired.include?(other_id) && (other_on - on).abs <= TRANSFER_WINDOW && (other_amount + amount).abs <= amount.abs * TRANSFER_TOLERANCE
+            match = others.find do |other_user_id, other_id, other_on, other_amount, other_counterparty|
+              !paired.include?(other_id) && (other_on - on).abs <= TRANSFER_WINDOW &&
+                (other_amount + amount).abs <= amount.abs * TRANSFER_TOLERANCE &&
+                (names?(counterparty, holders[other_user_id]) || names?(other_counterparty, holders[user_id]))
             end
-            paired << id << match.first if match
+            paired << id << match[1] if match
           end
         end
         paired.to_a
       end
+    end
+
+    # The rows that count in the stats: uncategorized or in a category that isn't excluded.
+    def countable
+      all.left_joins(:transaction_category).where(transaction_categories: { id: nil }).or(all.left_joins(:transaction_category).merge(TransactionCategory.in_stats))
+    end
+
+    # The words of the account holder names the banks report for a user's accounts.
+    def holder_tokens(user)
+      user.bank_accounts.filter_map { |account| account.raw&.dig("name") }.flat_map { |name| name_tokens(name) }.to_set
+    end
+
+    def names?(counterparty, tokens)
+      counterparty.present? && tokens.intersect?(name_tokens(counterparty))
+    end
+
+    def name_tokens(name)
+      name.to_s.downcase.scan(/[[:alpha:]]{3,}/)
     end
 
     def slices

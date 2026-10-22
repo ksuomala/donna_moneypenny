@@ -46,19 +46,23 @@ transaction differently (`bin/rails rules:list`, `rules:upsert`, `rules:toggle`)
 Then a background job sends the remaining uncategorised transactions to a model
 (OpenAI GPT-6 Luna by default; `CATEGORIZER_MODEL` picks OpenAI `gpt-*`, Claude `claude-*` or TypeSafe `jev-*`) in batches, with the category
 descriptions, the earlier decisions and every field of each transaction, and gets back a
-decision per transaction in a fixed JSON schema. Code guardrails then turn risky answers into
+decision per transaction in a fixed JSON schema. Both run once per user: each user's rules,
+categories, loans and earlier decisions are their own, and nothing of one user's reaches
+another's model context. Code guardrails then turn risky answers into
 unsure ones. Every decision is stored with its reason. Confident ones are written only once
 `CATEGORIZER_APPLY` is `true`; until then the job runs in shadow mode.
 
 ```sh
-bin/rails credentials:edit                         # add anthropic: api_key: ...
+bin/rails credentials:edit                         # add openai: api_key: ... (or anthropic:, typesafe:)
 bin/rails transactions:categorizer_eval SAMPLE=200 # precision on transactions you already categorised
 bin/rails transactions:categorizer_run DRY_RUN=1   # one batch, printed, nothing stored
+bin/rails transactions:categorizer_run ALL=1       # a run for every user now, as after the sync
 bin/rails transactions:unsure                      # what the latest run wasn't sure about
-bin/rails transactions:categorizer_runs            # runs, tokens and cost
+bin/rails transactions:categorizer_runs            # every user's runs, tokens and cost
 ```
 
-Without an API key the job does nothing.
+Every task acts for the first user unless `EMAIL=...` names another. Without an API key the job
+does nothing.
 
 ## Users
 
@@ -71,8 +75,9 @@ bin/rails users:password EMAIL=you@example.com # also signs out its sessions
 ```
 
 Each user has their own bank connections, categories, rules and loans. The first user created
-also gets every record that has no owner yet. The nightly sync, the categorizer and the rake
-tasks still work on the first user's data.
+also gets every record that has no owner yet. The nightly sync covers every connection, and the
+rules pass and the categorizer run once per user who has categories, each on that user's data
+alone. The rake tasks act for the first user unless `EMAIL=...` names another.
 
 ## Stack
 

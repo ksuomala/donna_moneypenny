@@ -30,21 +30,21 @@ class SyncBankTransactionsJob < ApplicationJob
     # Fail the job (visible in Solid Queue's failed executions) after trying every account.
     raise EnableBanking::Client::Error, "Bank sync failed for #{failures.size} account(s): #{failures.join('; ')}" if failures.any?
   ensure
-    # Rules first, then the categorizer, also when an account failed: the others' transactions are new.
-    apply_rules
+    # Rules first, then the categorizer, for every user with categories, also when an account
+    # failed: the others' transactions are new.
+    User.categorizing.each { |user| apply_rules(user) } if Rails.configuration.x.categorizer.rules
     CategorizeTransactionsJob.perform_later
   end
 
   private
 
-  # A broken rule must not stop the categorizer, so its errors are only logged.
-  def apply_rules
-    return unless Rails.configuration.x.categorizer.rules
-
-    result = BankTransactions::Rules.refresh!
-    Rails.logger.info("[rules] #{result[:retired].size} retired, #{result[:derived].size} derived, " \
+  # One user's rules on their transactions. A broken rule must not stop the categorizer, so its
+  # errors are only logged.
+  def apply_rules(user)
+    result = BankTransactions::Rules.refresh!(user)
+    Rails.logger.info("[rules] #{user.email_address}: #{result[:retired].size} retired, #{result[:derived].size} derived, " \
                       "#{result[:applied].categorized.values.sum} transaction(s) categorized, #{result[:applied].linked} linked to a loan")
   rescue StandardError => e
-    Rails.logger.error("[rules] failed: #{e.class}: #{e.message}")
+    Rails.logger.error("[rules] #{user.email_address} failed: #{e.class}: #{e.message}")
   end
 end

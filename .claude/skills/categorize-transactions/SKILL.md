@@ -13,10 +13,17 @@ Rules come first: references, reference prefixes and the same amount to the same
 (`CategorizationRule`), created from the history when they have been used consistently at least
 three times, and switched off automatically as soon as a categorization contradicts them. Then the
 app categorizes the rest by itself every night after the sync (`CategorizeTransactionsJob`, with
-Claude through the API). Every decision is stored. Until `CATEGORIZER_APPLY` is switched on it
-only stores them (shadow mode); after that it writes the confident ones and keeps the unsure ones
-with a best guess. This skill handles what the categorizer was unsure about, and keeps the rules
-it follows (the category descriptions) up to date.
+a model through the API: OpenAI's GPT-6 Luna by default, `CATEGORIZER_MODEL` in
+`config/deploy.yml` picks another, Claude `claude-*` or TypeSafe `jev-*`). Every decision is
+stored. In production `CATEGORIZER_APPLY` is on, so the confident decisions are written to the
+transactions and the unsure ones are kept with a best guess; without it the job only stores
+decisions (shadow mode). This skill handles what the categorizer was unsure about, and keeps the
+rules it follows (the category descriptions) up to date.
+
+Everything is per user. Each user has their own categories, rules, loans and accounts, and the
+nightly rules pass and categorizer run once for every user who has categories, each run built
+from that user's data alone: nothing of one user's reaches another's model context, and a
+transfer between two users' accounts is not an own transfer for either.
 
 ## Commands
 
@@ -26,13 +33,17 @@ database any other way (no `rails runner` updates, no console). Production is re
 Kamal. Drop the `bin/kamal app exec --reuse '…'` wrapper to run against the local database.
 
 ```sh
-# Read-only: the latest categorizer run's unsure decisions, grouped by counterparty, with the
-# model's guess, reason, and the guardrail that stopped it. The skill starts here.
+# Read-only: the user's latest categorizer run's unsure decisions, grouped by counterparty, with
+# the model's guess, reason, and the guardrail that stopped it. The skill starts here.
 bin/kamal app exec --reuse 'bin/rails transactions:unsure'
-# Read-only: the categorizer runs with counts, tokens and cost
+# Read-only: every user's categorizer runs with counts, tokens and cost
 bin/kamal app exec --reuse 'bin/rails transactions:categorizer_runs'
-# Test the categorizer on already categorized transactions (writes nothing; costs API tokens).
-# Run it after changing descriptions, before trusting the change.
+# Run the categorizer now instead of waiting for the nightly sync: the user's backlog in the
+# background, ALL=1 for every user, DRY_RUN=1 for one batch printed and nothing stored
+bin/kamal app exec --reuse 'bin/rails transactions:categorizer_run'
+bin/kamal app exec --reuse 'bin/rails transactions:categorizer_run DRY_RUN=1 LIMIT=20'
+# Test the categorizer on the user's already categorized transactions (writes nothing; costs API
+# tokens). Run it after changing descriptions, before trusting the change.
 bin/kamal app exec --reuse 'bin/rails transactions:categorizer_eval SAMPLE=200'
 
 # Rules: every rule with its matches and conflicts; a manual rule (e.g. a loan's installment
@@ -67,10 +78,10 @@ bin/kamal app exec --reuse 'bin/rails bank:sync'
 bin/kamal app exec --reuse 'bin/rails accounts:balances'
 ```
 
-Every task above works on the owner's data. For another user's transactions and categories, add
-`EMAIL=their@address` to the command: the listings, `categorize`, `link_loans` and the
-`categories:*` tasks then act for that user, whose categories are their own (the nightly
-categorizer and the rules still run only for the owner).
+Every task above works on the owner's data. For another user, add `EMAIL=their@address` to the
+command: every `transactions:*`, `rules:*` and `categories:*` task then acts for that user, on
+their transactions, categories, rules, loans and runs. `bank:sync` and `accounts:balances` cover
+every connection regardless.
 
 `categorize` and `link_loans` only fill in what's missing. It skips transactions that already have one
 (including ones the user set by hand) and pending ones (the sync replaces those every day).
@@ -109,8 +120,10 @@ shared with the nightly categorizer: `app/services/bank_transactions/categorizer
 Read it before deciding anything, and follow it the same way the categorizer does. Change it
 there, never here, so the two never drift apart; then run `transactions:categorizer_eval`.
 
-**Never re-categorize.** If an existing category looks wrong, report it to the user instead
-of changing it.
+**Never re-categorize on your own.** If an existing category looks wrong, report it to the user
+instead of changing it. When the user decides a move, `transactions:recategorize ASSIGN=...`
+(same pairs as `categorize`, `DRY_RUN=1` first) moves transactions whatever their category and
+drops a loan link.
 
 ## When you learn something
 
@@ -125,4 +138,6 @@ bin/kamal app exec --reuse 'bin/rails categories:upsert NAME="Loans" DESCRIPTION
 
 The descriptions in the database are the shared source of truth, also for the nightly
 categorizer. A changed description makes the categorizer reconsider the transactions it was
-unsure about on its next run. `db/seeds.rb` only holds generic defaults and never overwrites them.
+unsure about on its next run. Each user's descriptions are their own: a rule learned for one
+user goes into that user's category (`EMAIL=...`), not the owner's. `db/seeds.rb` only holds
+generic defaults and never overwrites them.

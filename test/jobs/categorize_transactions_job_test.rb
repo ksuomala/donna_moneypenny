@@ -123,7 +123,7 @@ class CategorizeTransactionsJobTest < ActiveJob::TestCase
     transaction("x")
     failing = CategorizerStub.new(raises: Anthropic::Errors::APIConnectionError.new(url: URI("https://api.anthropic.com"), message: "down"))
     error = CategorizerStub.with(failing) do
-      CategorizeTransactionsJob.perform_now
+      CategorizeTransactionsJob.perform_now(user_id: User.owner.id)
     rescue Anthropic::Errors::APIConnectionError => e
       e
     end
@@ -141,14 +141,56 @@ class CategorizeTransactionsJobTest < ActiveJob::TestCase
     assert_empty CategorizationRun.all
   end
 
-  test "only the owner's transactions are decided until the categorizer runs per user" do
-    theirs = BankConnection.create!(user: User.where.not(id: User.owner.id).first, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
-    other = theirs.bank_accounts.create!(uid: "acc-2", currency: "EUR")
-    other.bank_transactions.create!(entry_reference: "x", status: "booked", occurred_on: Date.new(2026, 10, 1), amount: -5, currency: "EUR", counterparty_name: "K-Market")
+  test "every user with categories gets a run of their own, built from their own data, and only their categories are accepted" do
+    @config.apply = true
+    other_user = User.where.not(id: User.owner.id).first
+    theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Danske Bank", aspsp_country: "DK", valid_until: 1.month.from_now)
+    other = theirs.bank_accounts.create!(uid: "acc-2", name: "Lønkonto", currency: "DKK")
+    their_groceries = TransactionCategory.create!(user: other_user, name: "Dagligvarer", kind: :expense)
+    their_row = other.bank_transactions.create!(entry_reference: "x", status: "booked", occurred_on: Date.new(2026, 10, 1), amount: -5, currency: "EUR", counterparty_name: "Netto")
+    their_cafe = other.bank_transactions.create!(entry_reference: "y", status: "booked", occurred_on: Date.new(2026, 10, 2), amount: -3, currency: "EUR", counterparty_name: "Cafe")
     mine = transaction("a")
+    contexts = []
+    # The right category for each user's groceries; for the cafe the owner's category, which is not theirs.
+    client = CategorizerStub.new do |ids|
+      BankTransaction.find(ids).map do |t|
+        category = { "K-Market" => @groceries, "Netto" => their_groceries, "Cafe" => @groceries }.fetch(t.counterparty_name)
+        { transaction_id: t.id, category_id: category.id, loan_id: nil, confidence: "confident", reason: "chain" }
+      end
+    end
+    client.define_singleton_method(:create) { |**params| contexts << params[:system_].second[:text]; super(**params) }
+
+    run_all(client)
+
+    runs = CategorizationRun.order(:id).to_a
+    assert_equal [ User.owner, other_user ], runs.map(&:user)
+    assert_equal [ [ 1, 1, 0, 1 ], [ 2, 1, 1, 1 ] ], runs.map { |r| [ r.transactions_count, r.confident_count, r.unsure_count, r.applied_count ] }
+    assert_equal @groceries, mine.reload.transaction_category
+    assert_equal their_groceries, their_row.reload.transaction_category
+    assert_nil their_cafe.reload.transaction_category
+    assert_equal "invalid category", runs.last.decisions.find_by(bank_transaction: their_cafe).guard
+    assert_equal [ mine.id ], runs.first.decisions.pluck(:bank_transaction_id)
+
+    mine_context, theirs_context = contexts
+    assert_includes mine_context, "Groceries"
+    assert_includes mine_context, @account.name
+    assert_not_includes mine_context, "Dagligvarer"
+    assert_not_includes mine_context, other.name
+    assert_includes theirs_context, "Dagligvarer"
+    assert_includes theirs_context, other.name
+    assert_not_includes theirs_context, "Groceries"
+    assert_not_includes theirs_context, @account.name
+  end
+
+  test "a user without categories gets no run" do
+    transaction("a")
+    other_user = User.where.not(id: User.owner.id).first
+    BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
+      .bank_accounts.create!(uid: "acc-2", currency: "EUR")
+      .bank_transactions.create!(entry_reference: "x", status: "booked", occurred_on: Date.new(2026, 10, 1), amount: -5, currency: "EUR", counterparty_name: "K-Market")
 
     run_all(stub)
 
-    assert_equal [ mine.id ], CategorizationDecision.pluck(:bank_transaction_id)
+    assert_equal [ User.owner ], CategorizationRun.all.map(&:user)
   end
 end

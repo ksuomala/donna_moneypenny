@@ -18,6 +18,9 @@ class BankTransactions::CategorizerEvalTest < ActiveSupport::TestCase
     cafe = transaction("b", "Cafe", @cafes)
     transaction("old", "Cafe", @cafes, occurred_on: Date.new(2025, 1, 1))
     transaction("open", "Other", nil)
+    theirs = BankConnection.create!(user: User.where.not(id: User.owner.id).first, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
+    theirs.bank_accounts.create!(uid: "acc-2", currency: "EUR").bank_transactions
+      .create!(entry_reference: "t", status: "booked", occurred_on: Date.new(2026, 10, 1), amount: -1, currency: "EUR", counterparty_name: "Netto", transaction_category: @cafes)
     contexts = []
     # Groceries for everything: right for the shop, wrong for the cafe.
     client = CategorizerStub.new do |ids|

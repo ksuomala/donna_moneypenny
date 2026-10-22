@@ -23,6 +23,18 @@ namespace :transactions do
     puts "Skipped (already categorized, pending or missing): #{result.skipped.join(", ")}" if result.skipped.any?
   end
 
+  desc "Move transactions to another category, also ones already categorized (the user's explicit decision; a loan link is dropped). " \
+       "ASSIGN=\"transaction_id=category_id,...\" DRY_RUN=1 to preview. EMAIL=... for another user"
+  task recategorize: :environment do
+    dry_run = ENV["DRY_RUN"].present?
+    result = BankTransactions::Categorization.reassign(BankTransactions::Categorization.parse(ENV.fetch("ASSIGN")), dry_run: dry_run, user: acting_user)
+    names = TransactionCategory.where(id: result.applied.values).pluck(:id, :name).to_h
+
+    puts "#{dry_run ? "Would move" : "Moved"} #{result.applied.size} transactions"
+    result.applied.values.tally.sort_by { |_, count| -count }.each { |id, count| puts "  #{count}\t#{names[id]}" }
+    puts "Skipped (already there, pending or missing): #{result.skipped.join(", ")}" if result.skipped.any?
+  end
+
   desc "Take the category, rule and loan off every transaction of a user, to start over. EMAIL=... DRY_RUN=1 to preview"
   task clear_categories: :environment do
     user = User.find_by!(email_address: ENV.fetch("EMAIL").strip.downcase)

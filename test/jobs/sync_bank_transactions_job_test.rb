@@ -103,9 +103,16 @@ class SyncBankTransactionsJobTest < ActiveJob::TestCase
     assert_equal 1, @second.bank_transactions.count
   end
 
-  test "rules categorize after the sync, before the categorizer" do
+  test "rules categorize after the sync, before the categorizer, each user's rules on their own transactions" do
     own = TransactionCategory.create!(name: "Own", exclude_from_stats: true)
     CategorizationRule.create!(reference: "ref-acc-1", transaction_category: own)
+    other_user = User.where.not(id: User.owner.id).first
+    theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now,
+                                    enable_banking_app: other_user.enable_banking_app || create_enable_banking_app(other_user))
+    third = theirs.bank_accounts.create!(uid: "acc-3")
+    their_own = TransactionCategory.create!(user: other_user, name: "Own", exclude_from_stats: true)
+    CategorizationRule.create!(reference: "ref-acc-3", transaction_category: their_own)
+    CategorizationRule.create!(reference: "ref-acc-2", transaction_category: their_own)
     client = StubClient.new
     client.define_singleton_method(:transactions) do |account_uid:, **params|
       super(account_uid: account_uid, **params).tap { |page| page["transactions"].each { |t| t["reference_number"] = "ref-#{account_uid}" } }
@@ -115,6 +122,7 @@ class SyncBankTransactionsJobTest < ActiveJob::TestCase
 
     assert_equal own, @first.bank_transactions.sole.transaction_category
     assert_nil @second.bank_transactions.sole.transaction_category
+    assert_equal their_own, third.bank_transactions.sole.transaction_category
   end
 
   test "the categorizer follows the sync, also when an account failed" do

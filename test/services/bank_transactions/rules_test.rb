@@ -101,6 +101,29 @@ class BankTransactions::RulesTest < ActiveSupport::TestCase
     assert fine.reload.active?
   end
 
+  test "each user's rules are derived from, applied to and checked against their own transactions only" do
+    other_user = User.where.not(id: User.owner.id).first
+    theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Danske Bank", aspsp_country: "DK", valid_until: 1.month.from_now)
+    account = theirs.bank_accounts.create!(uid: "acc-3", currency: "DKK")
+    their_own = TransactionCategory.create!(user: other_user, name: "Own", exclude_from_stats: true)
+    3.times { transaction(reference: "5550001234", category: their_own, account: account) }
+    open_theirs = transaction(reference: "5550001234", account: account)
+    open_mine = transaction(reference: "5550001234")
+
+    assert_empty BankTransactions::Rules.derive!
+    rule = BankTransactions::Rules.derive!(other_user).sole
+    assert_equal [ other_user, their_own ], [ rule.user, rule.transaction_category ]
+
+    result = BankTransactions::Rules.refresh!(other_user)
+
+    assert_equal({ rule => 1 }, result[:applied].categorized)
+    assert_equal their_own, open_theirs.reload.transaction_category
+    assert_nil open_mine.reload.transaction_category
+    assert_equal [ 4, 0 ], BankTransactions::Rules.check(rule)
+    assert_empty BankTransactions::Rules.refresh![:applied].categorized
+    assert_nil open_mine.reload.transaction_category
+  end
+
   test "refresh! retires, derives and applies, so a derived rule fills in the rest of its reference at once" do
     3.times { transaction(reference: "5550001234", category: @own) }
     open = transaction(reference: "5550001234")

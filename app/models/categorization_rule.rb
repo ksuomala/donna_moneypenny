@@ -1,7 +1,7 @@
 # A deterministic categorization: a transaction matching every condition the rule sets gets its
 # category (and loan), before any model sees it. A rule must be precise: a reference, a
 # reference prefix, or a counterparty together with an exact amount (the same rent or
-# installment to the same person every month). A payee name alone can never be a rule. Derived rules are created from the owner's
+# installment to the same person every month). A payee name alone can never be a rule. Derived rules are created from the user's
 # own history (BankTransactions::Rules.derive!); manual ones are set with rules:upsert, e.g.
 # for loan installments whose reference changes every month but keeps a prefix.
 class CategorizationRule < ApplicationRecord

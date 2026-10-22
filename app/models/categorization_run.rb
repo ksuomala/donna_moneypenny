@@ -1,5 +1,5 @@
-# One pass of the categorizer over a set of transactions (CategorizeTransactionsJob), with its
-# decisions, token usage and outcome. shadow runs only store decisions, apply runs also write
+# One pass of the categorizer over a set of one user's transactions (CategorizeTransactionsJob,
+# one run per user), with its decisions, token usage and outcome. shadow runs only store decisions, apply runs also write
 # the confident ones to the transactions, eval runs test the categorizer on transactions that
 # already have a category (transactions:categorizer_eval).
 class CategorizationRun < ApplicationRecord
@@ -53,11 +53,11 @@ class CategorizationRun < ApplicationRecord
     lines.join("\n")
   end
 
-  # The latest runs: id, mode, started, finished, transactions, confident, unsure, applied, tokens in/out/cached, cost, error.
+  # The latest runs of every user: id, user, mode, started, finished, transactions, confident, unsure, applied, tokens in/out/cached, cost, error.
   def self.summary_lines(limit: 20)
-    lines = [ "# id, mode, model, started, finished, transactions, confident, unsure, applied, input tokens, output tokens, cache reads, cost USD, error" ]
-    latest_first.limit(limit).each do |run|
-      lines << [ run.id, run.mode, run.model, run.started_at&.strftime("%F %R"), run.finished_at&.strftime("%F %R") || "running", run.transactions_count,
+    lines = [ "# id, user, mode, model, started, finished, transactions, confident, unsure, applied, input tokens, output tokens, cache reads, cost USD, error" ]
+    latest_first.includes(:user).limit(limit).each do |run|
+      lines << [ run.id, run.user&.email_address, run.mode, run.model, run.started_at&.strftime("%F %R"), run.finished_at&.strftime("%F %R") || "running", run.transactions_count,
                  run.confident_count, run.unsure_count, run.applied_count, run.input_tokens, run.output_tokens, run.cache_read_input_tokens,
                  run.cost&.round(3), run.error&.first(80) ].map { |v| v.to_s.squish }.join("\t")
     end

@@ -172,6 +172,25 @@ class BankTransactions::CategorizationTest < ActiveSupport::TestCase
     assert_not_includes their_context, "Groceries"
   end
 
+  test "reassign moves categorized transactions and drops their loan link" do
+    loans = TransactionCategory.create!(name: "Loans", exclude_from_stats: true)
+    loan = Loan.create!(name: "Loan from a friend", creditor: "Friend")
+    rent = TransactionCategory.create!(name: "Rent received", kind: :income)
+    moved = transaction("a", transaction_category: loans, loan: loan)
+    same = transaction("b", transaction_category: rent)
+    pending = transaction("c", status: "pending", transaction_category: loans)
+
+    preview = BankTransactions::Categorization.reassign({ moved.id => rent.id, same.id => rent.id, pending.id => rent.id, 999_999 => rent.id }, dry_run: true)
+    assert_equal({ moved.id => rent.id }, preview.applied)
+    assert_equal [ same.id, pending.id, 999_999 ], preview.skipped
+    assert_equal loans, moved.reload.transaction_category
+
+    BankTransactions::Categorization.reassign({ moved.id => rent.id })
+    assert_equal rent, moved.reload.transaction_category
+    assert_nil moved.loan
+    assert_raises(ArgumentError) { BankTransactions::Categorization.reassign({ moved.id => @investment.id }) }
+  end
+
   test "clear! takes the categories, rules and loans off one user's transactions only" do
     other_user = User.where.not(id: User.owner.id).first
     theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)

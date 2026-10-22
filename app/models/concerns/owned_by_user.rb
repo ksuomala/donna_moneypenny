@@ -1,6 +1,6 @@
 # A record that belongs to one user. A record created during a request goes to the signed-in
-# user; one created by a rake task or background job goes to the owner (User.owner), until those
-# run per user.
+# user; one created by a rake task goes to the user it acts for (Current.user, set from
+# EMAIL=..., else the owner). Background jobs set the user explicitly.
 module OwnedByUser
   extend ActiveSupport::Concern
 

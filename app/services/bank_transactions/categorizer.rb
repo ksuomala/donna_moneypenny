@@ -1,10 +1,10 @@
 module BankTransactions
-  # Decides the categories of a batch of uncategorized transactions with a model (Claude by
-  # default; OpenAI and TypeSafe's Jev through the backends in categorizer/), in one request
-  # with a structured answer. The model gets the same context the
-  # categorize-transactions skill reads (categories with their descriptions, loans, accounts,
-  # earlier decisions per counterparty), the batch with every field, and for each transaction
-  # the rows that could be the other side of a transfer.
+  # Decides the categories of a batch of one user's uncategorized transactions with a model
+  # (OpenAI's GPT-6 Luna by default; Claude and TypeSafe's Jev through the other backends in
+  # categorizer/), in one request with a structured answer. The model gets the same context the
+  # categorize-transactions skill reads, all of it the user's own (categories with their
+  # descriptions, loans, accounts, earlier decisions per counterparty), the batch with every
+  # field, and for each transaction the rows that could be the other side of a transfer.
   #
   # Every answer passes through guardrails here before anyone trusts it: unknown or parent
   # categories, large amounts without precedent, own transfers without an other side and loans
@@ -66,15 +66,15 @@ module BankTransactions
     def self.prompt_version = Digest::SHA256.hexdigest(prompt).first(12)
 
     # Identifies the rules a run was made with: the user's categories and their descriptions.
-    def self.rules_digest(user = User.owner)
+    def self.rules_digest(user = Categorization.acting)
       Digest::SHA256.hexdigest(TransactionCategory.where(user: user).order(:id).pluck(:id, :name, :parent_id, :description).to_json).first(12)
     end
 
     # excluding: transaction ids to hide from the context (the evaluation sends categorized
     # transactions as if they were new, and their own decisions must not be visible).
-    # client: a stand-in for the provider's client, in tests. user: whose transactions, categories
-    # and loans; the owner's until the categorizer runs per user.
-    def initialize(excluding: [], model: Rails.configuration.x.categorizer.model, effort: Rails.configuration.x.categorizer.effort, client: nil, user: User.owner)
+    # client: a stand-in for the provider's client, in tests. user: whose transactions, categories,
+    # loans and precedents; nothing of any other user's reaches the model.
+    def initialize(excluding: [], model: Rails.configuration.x.categorizer.model, effort: Rails.configuration.x.categorizer.effort, client: nil, user: Categorization.acting)
       @excluding = excluding
       @model = model
       @user = user

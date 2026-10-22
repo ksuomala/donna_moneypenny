@@ -7,8 +7,9 @@ module BankTransactions
   # (set by hand or in an earlier run) is left alone. Pending transactions are skipped because
   # every sync replaces them.
   #
-  # Everything is one user's: the one a rake task acts for (lib/tasks/acting_user.rake) or the
-  # owner, whose data the nightly categorizer works on.
+  # Everything is one user's: the one passed as user:, else the one a rake task acts for
+  # (lib/tasks/acting_user.rake), else the owner. The nightly rules pass and categorizer pass the
+  # user explicitly, one run per user.
   class Categorization
     Result = Data.define(:applied, :skipped)
 
@@ -137,6 +138,30 @@ module BankTransactions
         BankTransaction.transaction do
           applied.group_by(&:last).each do |category_id, pairs|
             BankTransaction.where(id: pairs.map(&:first), transaction_category_id: nil).update_all(transaction_category_id: category_id, updated_at: Time.current)
+          end
+        end
+      end
+
+      Result.new(applied: applied.to_h, skipped: skipped.to_h.keys)
+    end
+
+    # Moves transactions to another category, categorized or not: the user's explicit decision,
+    # unlike apply, which only fills in blanks. A transaction moved off a loan's category loses
+    # its loan and rule links. Returns applied (moved) and skipped (pending, missing, or already
+    # in that category).
+    def self.reassign(assignments, dry_run: false, user: acting)
+      categories = TransactionCategory.where(user: user, id: assignments.values.uniq).includes(:children).index_by(&:id)
+      invalid = assignments.values.uniq.reject { |id| categories[id] && categories[id].children.empty? }
+      raise ArgumentError, "Unknown or parent categories: #{invalid.join(", ")}" if invalid.any?
+
+      current = user.bank_transactions.booked.where(id: assignments.keys).pluck(:id, :transaction_category_id).to_h
+      applied, skipped = assignments.partition { |transaction_id, category_id| current.key?(transaction_id) && current[transaction_id] != category_id }
+
+      unless dry_run
+        BankTransaction.transaction do
+          applied.group_by(&:last).each do |category_id, pairs|
+            BankTransaction.where(id: pairs.map(&:first)).update_all(transaction_category_id: category_id, categorization_rule_id: nil,
+                                                                      loan_id: nil, updated_at: Time.current)
           end
         end
       end

@@ -25,8 +25,13 @@ class User < ApplicationRecord
   validates :email_address, presence: true, uniqueness: true
   validates :password, length: { minimum: 12 }, allow_nil: true
 
-  # The first user. Rake tasks and background jobs work on the owner's data until they run per user.
+  # The first user: the default for rake tasks run without EMAIL=..., and the one who gets the
+  # records from before there were users.
   def self.owner = order(:id).first
+
+  # The users the nightly rules pass and categorizer run for: everyone who has categories, each
+  # with a run of their own over their own transactions, categories, loans and rules.
+  scope :categorizing, -> { where(id: TransactionCategory.select(:user_id)).order(:id) }
 
   # This user and the other members of their household, for the combined stats.
   def household_members

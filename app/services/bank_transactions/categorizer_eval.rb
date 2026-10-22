@@ -1,7 +1,7 @@
 module BankTransactions
-  # Tests the categorizer on transactions that already have a category: a random sample is sent
-  # as if it were new, with its own decisions hidden from the context, and the answers are
-  # compared with the categories the transactions have. Writes nothing to the transactions; the
+  # Tests the categorizer on one user's transactions that already have a category: a random
+  # sample is sent as if it were new, with its own decisions hidden from the context, and the
+  # answers are compared with the categories the transactions have. Writes nothing to the transactions; the
   # decisions are kept as an eval run. Precision is reported separately for transactions whose
   # counterparty had the same category on the same account outside the sample (precedent) and
   # for the rest, since precedent makes the first group easier.
@@ -11,7 +11,9 @@ module BankTransactions
     end
 
     # seed: the same seed picks the same sample, so models can be compared on identical transactions.
-    def initialize(sample:, since: nil, batch_size: Rails.configuration.x.categorizer.batch_size, model: Rails.configuration.x.categorizer.model, seed: nil)
+    def initialize(sample:, since: nil, batch_size: Rails.configuration.x.categorizer.batch_size, model: Rails.configuration.x.categorizer.model, seed: nil,
+                   user: Categorization.acting)
+      @user = user
       @seed = seed
       @sample = sample
       @since = since
@@ -22,15 +24,15 @@ module BankTransactions
     attr_reader :run, :rows
 
     def call
-      scope = BankTransaction.booked.where.not(transaction_category_id: nil)
+      scope = @user.bank_transactions.booked.where.not(transaction_category_id: nil)
       scope = scope.where(occurred_on: @since..) if @since
       order = @seed ? Arel.sql("RAND(#{Integer(@seed)})") : Arel.sql("RAND()")
       transactions = scope.order(order).limit(@sample).to_a
       ids = transactions.map(&:id)
 
-      categorizer = Categorizer.new(excluding: ids, model: @model)
-      precedents = Categorization.known_decisions(excluding: ids).map { |name, account_id, category_id, _| [ name, account_id, category_id ] }.to_set
-      @run = CategorizationRun.create!(mode: :eval, model: @model, prompt_version: Categorizer.prompt_version, rules_digest: Categorizer.rules_digest,
+      categorizer = Categorizer.new(excluding: ids, model: @model, user: @user)
+      precedents = Categorization.known_decisions(excluding: ids, user: @user).map { |name, account_id, category_id, _| [ name, account_id, category_id ] }.to_set
+      @run = CategorizationRun.create!(user: @user, mode: :eval, model: @model, prompt_version: Categorizer.prompt_version, rules_digest: Categorizer.rules_digest(@user),
                                        started_at: Time.current, transactions_count: transactions.size)
       @rows = []
 
@@ -51,8 +53,8 @@ module BankTransactions
     end
 
     def report
-      names = TransactionCategory.pluck(:id, :name).to_h
-      lines = [ "# eval run #{run.id} with #{run.model}#{" (seed #{@seed})" if @seed}: #{rows.size} categorized transactions sent as new, cost ~#{run.cost&.round(3)} USD" ]
+      names = TransactionCategory.where(user: @user).pluck(:id, :name).to_h
+      lines = [ "# eval run #{run.id} for #{@user.email_address} with #{run.model}#{" (seed #{@seed})" if @seed}: #{rows.size} categorized transactions sent as new, cost ~#{run.cost&.round(3)} USD" ]
       lines << "# group, transactions, confident, confident correct, confident precision, unsure guesses correct"
       { "all" => rows, "with precedent" => rows.select(&:precedent), "without precedent" => rows.reject(&:precedent) }.each do |label, group|
         confident = group.select { |r| r.verdict.confident? }

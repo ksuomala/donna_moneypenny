@@ -1,0 +1,63 @@
+<section class="stats-section budget">
+  <h2>Budget<% if report %> <span class="muted">for <%= @scope == "household" ? Current.user.household.name : "me" %></span><% end %></h2>
+
+  <% if report %>
+    <% if report.partial? %>
+      <p class="muted">The budget covers <%= l report.range.begin, format: :long %> – <%= l report.range.end, format: :long %> of this period.</p>
+    <% elsif report.months != 1 %>
+      <p class="muted">Monthly amounts × <%= number_with_precision(report.months, precision: 2, strip_insignificant_zeros: true) %> for this period.</p>
+    <% end %>
+
+    <ul class="budget-rows">
+      <% ([ report.total ].compact + report.rows).each do |row| %>
+        <li class="<%= class_names("budget-row", "budget-row-total": row.name == "Total", "budget-row-over": row.over?) %>">
+          <span class="bar-label"><%= row.name %></span>
+          <span class="bar-track"><span class="bar" style="width: <%= row.used %>%"></span></span>
+          <span class="bar-value">
+            <%= money(row.spent) %> <span class="muted">of <%= money(row.budget) %></span>
+            · <%= row.over? ? "#{money(-row.left)} over" : "#{money(row.left)} left" %>
+          </span>
+        </li>
+      <% end %>
+    </ul>
+  <% elsif budget.nil? %>
+    <p class="muted">No budget for this period yet.</p>
+  <% end %>
+
+  <details class="budget-form-details" <%= "open" if flash[:alert].to_s.start_with?("Budget") %>>
+    <summary><%= form_budget.new_record? ? "Add a budget" : "Edit this budget" %></summary>
+
+    <%= form_with model: form_budget, url: (form_budget.new_record? ? budgets_path : budget_path(form_budget)), class: "settings-form budget-form" do |form| %>
+      <%= hidden_field_tag "budget[scope]", @scope %>
+
+      <div class="budget-dates">
+        <span class="field"><%= form.label :starts_on, "From" %> <%= form.date_field :starts_on, required: true %></span>
+        <span class="field"><%= form.label :ends_on, "Until (optional)" %> <%= form.date_field :ends_on %></span>
+      </div>
+
+      <%= form.label :monthly_total, "Total spending per month" %>
+      <%= form.number_field :monthly_total, step: "0.01", min: 0, placeholder: "no total" %>
+
+      <p class="muted">Per category, per month. Leave blank for no limit.</p>
+      <div class="budget-lines">
+        <% amounts = form_budget.lines.to_h { |line| [ line.category_name, line.monthly_amount ] } %>
+        <% categories.each do |name| %>
+          <label class="budget-line">
+            <span><%= name %></span>
+            <%= number_field_tag "budget[lines_attributes][#{name}]", amounts[name]&.to_s("F"), step: "0.01", min: 0, placeholder: "–" %>
+          </label>
+        <% end %>
+      </div>
+
+      <%= form.submit "Save budget", class: "button" %>
+    <% end %>
+
+    <% unless form_budget.new_record? %>
+      <p class="budget-actions">
+        <%= link_to "Start a new budget from another date", stats_path(request.query_parameters.merge(new_budget: 1)) %> ·
+        <%= button_to "Remove this budget", budget_path(form_budget), method: :delete, class: "link-button", form_class: "button-to",
+              form: { data: { turbo_confirm: "Remove this budget?" } } %>
+      </p>
+    <% end %>
+  </details>
+</section>

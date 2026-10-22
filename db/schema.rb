@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_23_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_23_120000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -91,6 +91,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_110000) do
     t.index ["categorization_rule_id"], name: "index_bank_transactions_on_categorization_rule_id"
     t.index ["loan_id"], name: "index_bank_transactions_on_loan_id"
     t.index ["transaction_category_id"], name: "index_bank_transactions_on_transaction_category_id"
+  end
+
+  create_table "budget_lines", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "budget_id", null: false
+    t.string "category_name", null: false
+    t.decimal "monthly_amount", precision: 12, scale: 2, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["budget_id", "category_name"], name: "index_budget_lines_on_budget_id_and_category_name", unique: true
+    t.index ["budget_id"], name: "index_budget_lines_on_budget_id"
+  end
+
+  create_table "budgets", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "user_id"
+    t.bigint "household_id"
+    t.date "starts_on", null: false
+    t.date "ends_on"
+    t.decimal "monthly_total", precision: 12, scale: 2
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["household_id"], name: "index_budgets_on_household_id"
+    t.index ["user_id"], name: "index_budgets_on_user_id"
   end
 
   create_table "categorization_decisions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -292,6 +314,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_110000) do
   add_foreign_key "bank_transactions", "categorization_rules", on_delete: :nullify
   add_foreign_key "bank_transactions", "loans"
   add_foreign_key "bank_transactions", "transaction_categories", on_delete: :nullify
+  add_foreign_key "budget_lines", "budgets"
+  add_foreign_key "budgets", "households"
+  add_foreign_key "budgets", "users"
   add_foreign_key "categorization_decisions", "bank_transactions", on_delete: :cascade
   add_foreign_key "categorization_decisions", "categorization_runs"
   add_foreign_key "categorization_decisions", "loans", on_delete: :nullify

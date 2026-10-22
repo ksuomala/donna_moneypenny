@@ -8,6 +8,7 @@ class User < ApplicationRecord
   has_secure_password
   belongs_to :household, optional: true
   has_many :household_aliases, dependent: :destroy
+  has_many :budgets, dependent: :destroy
   has_many :sessions, dependent: :destroy
   has_one :enable_banking_app, dependent: :destroy
 

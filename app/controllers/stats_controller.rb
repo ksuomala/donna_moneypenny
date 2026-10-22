@@ -24,6 +24,12 @@ class StatsController < ApplicationController
         custom_range
       end
     @stats = BankTransactions::Stats.new(@range, users: @scope == "household" ? @members : [ Current.user ])
+    # The budget in force for the period, for this scope; the form edits it, or starts a new one.
+    @budget_owner = @scope == "household" ? Current.user.household : Current.user
+    @budget = Budget.applying_to(@budget_owner, @range)
+    @budget_report = BudgetReport.for(@budget, @stats)
+    @budget_form = params[:new_budget].present? || @budget.nil? ? Budget.new(starts_on: @range.begin.beginning_of_month) : @budget
+    @budget_categories = TransactionCategory.where(user: @stats.users).in_stats.where.missing(:children).distinct.order(:name).pluck(:name)
   end
 
   private

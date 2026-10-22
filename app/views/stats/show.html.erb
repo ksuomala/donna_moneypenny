@@ -62,6 +62,8 @@
     </div>
   </div>
 
+  <%= render "budget", report: @budget_report, budget: @budget, form_budget: @budget_form, categories: @budget_categories %>
+
   <div data-controller="tabs" data-tabs-storage-key-value="stats-chart">
     <div class="tabs" role="tablist">
       <button type="button" role="tab" class="tab" data-tabs-target="tab" data-tab="bar" data-action="tabs#select">Bar chart</button>

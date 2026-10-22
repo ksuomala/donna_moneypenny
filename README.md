@@ -15,7 +15,11 @@ you stats.
 - **Stores them as events.** Every transaction lands in the database as it came from the bank,
   so stats can always be recomputed from the source.
 - **Shows stats.** Income and expenses by category, net result, account balances and loan
-  balances for any period.
+  balances for any period, in euros or converted to another currency at the ECB rate.
+- **Budgets.** A monthly total and per-category amounts from a start date, shown against the
+  period's spending on the stats page.
+- **Households.** Users in a household can see their stats combined, with payments between
+  the members left out.
 
 ## Categorising transactions
 

@@ -158,6 +158,10 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     txn(1350, loans).update!(counterparty_name: "ALEX EXAMPLE")
     # A payment to the owner's account at a bank that isn't connected: only their side exists, still out.
     theirs.(-642, their_housing, "Owner Example lunar")
+    # A MobilePay payment from the owner names the service as the counterparty and the owner in the description.
+    their_account.bank_transactions.create!(entry_reference: "mp", status: "booked", occurred_on: Date.new(2026, 10, 5), amount: 535,
+                                            currency: "EUR", transaction_category: their_housing, counterparty_name: "VIPPS MOBILEPAY",
+                                            description: "MobilePay Owner Example")
     # Their own rent to a landlord stays, and so does an uncategorized gift from someone else.
     theirs.(-600, their_housing, "Landlord")
     @account.bank_transactions.create!(entry_reference: "gift", status: "booked", occurred_on: Date.new(2026, 10, 6), amount: 20,
@@ -174,6 +178,6 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     assert_equal [ [ "Groceries", 100 ] ], mine.expenses.map { [ it.name, it.amount ] }
     assert_equal 0, mine.internal_transfers
     theirs_only = BankTransactions::Stats.new(@range, users: [ other ])
-    assert_equal [ [ "Housing", BigDecimal("2597.40") ], [ "Groceries", 50 ] ], theirs_only.expenses.map { [ it.name, it.amount ] }
+    assert_equal [ [ "Housing", BigDecimal("2062.40") ], [ "Groceries", 50 ] ], theirs_only.expenses.map { [ it.name, it.amount ] }
   end
 end

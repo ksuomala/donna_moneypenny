@@ -10,11 +10,11 @@ class HouseholdAlias < ApplicationRecord
 
   validates :name, presence: true, uniqueness: { scope: :user_id, case_sensitive: false }
 
-  # Whether a counterparty name is one of these aliases.
-  def self.match?(counterparty, aliases)
-    return false if counterparty.blank?
+  # Whether a counterparty name or description contains one of these aliases.
+  def self.match?(text, aliases)
+    return false if text.blank?
 
-    needle = counterparty.squish.downcase
-    aliases.any? { |name| needle.include?(name.downcase) }
+    haystack = text.squish.downcase
+    aliases.any? { |name| haystack.include?(name.downcase) }
   end
 end

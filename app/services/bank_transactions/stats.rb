@@ -92,15 +92,17 @@ module BankTransactions
       household? ? all.where.not(id: internal_transfer_ids) : all
     end
 
-    # Transactions whose counterparty is another member of the household, by that member's
-    # aliases: payments between members, whichever side and whatever the category.
+    # Transactions with another member of the household on the other side, by that member's
+    # aliases in the counterparty or the description (a MobilePay payment names the payment
+    # service as the counterparty and the person in the description): payments between
+    # members, whichever side and whatever the category.
     def internal_transfer_ids
       @internal_transfer_ids ||= users.flat_map do |member|
         others = HouseholdAlias.where(user: users - [ member ]).pluck(:name)
         next [] if others.empty?
 
-        all.where(bank_account_id: member.bank_accounts.select(:id)).where.not(counterparty_name: [ nil, "" ])
-          .pluck(:id, :counterparty_name).filter_map { |id, counterparty| id if HouseholdAlias.match?(counterparty, others) }
+        all.where(bank_account_id: member.bank_accounts.select(:id)).pluck(:id, :counterparty_name, :description)
+          .filter_map { |id, counterparty, description| id if HouseholdAlias.match?(counterparty, others) || HouseholdAlias.match?(description, others) }
       end
     end
 

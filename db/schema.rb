@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_22_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_210000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -18,6 +18,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_200000) do
     t.string "booked_type"
     t.decimal "available", precision: 12, scale: 2
     t.string "available_type"
+    t.decimal "source_booked", precision: 12, scale: 2
+    t.decimal "source_available", precision: 12, scale: 2
+    t.string "source_currency"
     t.json "raw"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -70,6 +73,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_200000) do
     t.date "value_date"
     t.decimal "amount", precision: 12, scale: 2, null: false
     t.string "currency", null: false
+    t.decimal "source_amount", precision: 12, scale: 2
+    t.string "source_currency"
     t.string "counterparty_name"
     t.text "description"
     t.string "reference_number"
@@ -162,6 +167,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_200000) do
     t.index ["application_id"], name: "index_enable_banking_apps_on_application_id", unique: true
     t.index ["callback_token"], name: "index_enable_banking_apps_on_callback_token", unique: true
     t.index ["user_id"], name: "index_enable_banking_apps_on_user_id", unique: true
+  end
+
+  create_table "exchange_rates", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "currency", null: false
+    t.date "on", null: false
+    t.decimal "rate", precision: 16, scale: 6, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["currency", "on"], name: "index_exchange_rates_on_currency_and_on", unique: true
   end
 
   create_table "expenses", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|

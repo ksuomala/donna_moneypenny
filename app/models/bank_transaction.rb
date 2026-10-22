@@ -11,7 +11,8 @@ class BankTransaction < ApplicationRecord
   validate :category_has_no_sub_categories
 
   # Maps one Enable Banking transaction to our columns. Amounts are signed:
-  # money out (DBIT) is negative, money in (CRDT) positive.
+  # money out (DBIT) is negative, money in (CRDT) positive. The amount is in the bank's
+  # currency here; the sync converts it to euros (BankTransactions::Conversion).
   def self.attributes_from_api(transaction)
     debit = transaction["credit_debit_indicator"] == "DBIT"
     amount = BigDecimal(transaction.dig("transaction_amount", "amount").to_s)

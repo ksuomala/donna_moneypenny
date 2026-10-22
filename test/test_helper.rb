@@ -4,6 +4,12 @@ require "rails/test_help"
 require_relative "test_helpers/session_test_helper"
 Dir[File.expand_path("support/**/*.rb", __dir__)].each { |file| require file }
 
+# Tests never reach the ECB: a conversion of a non-euro amount needs a stubbed rates client.
+class UnstubbedExchangeRates
+  def rates(**) = raise("ExchangeRates::Client called without a stub client in a test")
+end
+ExchangeRates::Client.factory = -> { UnstubbedExchangeRates.new }
+
 # Tests never reach a model provider: an unstubbed client raises instead of spending tokens.
 [ BankTransactions::Categorizer::AnthropicBackend, BankTransactions::Categorizer::OpenaiBackend, BankTransactions::Categorizer::JevBackend ].each do |backend|
   backend.client_factory = -> { raise "#{backend.name} called without a stub client in a test" }

@@ -1,7 +1,8 @@
 # An account's balances as the bank reported them on a day: one row per account per day,
 # recorded by the daily sync. Booked is signed the bank's way, positive for money in a
 # current account and negative for money owed on a credit card. booked_type and
-# available_type say which of the bank's balance types each amount came from.
+# available_type say which of the bank's balance types each amount came from. Amounts are in
+# euros; an account in another currency keeps the bank's figures in source_*.
 class BankAccountBalance < ApplicationRecord
   belongs_to :bank_account
 

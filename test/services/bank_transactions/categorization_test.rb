@@ -147,4 +147,42 @@ class BankTransactions::CategorizationTest < ActiveSupport::TestCase
     assert_equal [ booked_side, pending_side ], hints[out.id]
     assert_equal [], hints[lone.id]
   end
+
+  test "listings and writes are one user's: another user's categories and transactions stay out" do
+    other_user = User.where.not(id: User.owner.id).first
+    theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
+    their_account = theirs.bank_accounts.create!(uid: "acc-2", currency: "EUR")
+    their_rent = TransactionCategory.create!(name: "Rent", kind: :expense, user: other_user)
+    their_transaction = their_account.bank_transactions.create!(entry_reference: "t", status: "booked", occurred_on: Date.new(2026, 10, 1),
+                                                                amount: -800, currency: "EUR", counterparty_name: "Landlord", transaction_category: their_rent)
+    mine = transaction("a")
+
+    context = BankTransactions::Categorization.context(user: User.owner)
+    assert_not_includes context, "Rent"
+    assert_not_includes context, "Landlord"
+    assert_not_includes BankTransactions::Categorization.uncategorized(user: User.owner), their_transaction.id.to_s
+
+    assert_raises(ArgumentError) { BankTransactions::Categorization.apply({ mine.id => their_rent.id }, user: User.owner) }
+    result = BankTransactions::Categorization.apply({ their_transaction.id => @groceries.id, mine.id => @groceries.id }, user: User.owner)
+    assert_equal [ their_transaction.id ], result.skipped
+    assert_equal @groceries, mine.reload.transaction_category
+
+    their_context = BankTransactions::Categorization.context(user: other_user)
+    assert_includes their_context, "Landlord\t#{their_account.id}\tRent\t1"
+    assert_not_includes their_context, "Groceries"
+  end
+
+  test "clear! takes the categories, rules and loans off one user's transactions only" do
+    other_user = User.where.not(id: User.owner.id).first
+    theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
+    their_transaction = theirs.bank_accounts.create!(uid: "acc-2", currency: "EUR").bank_transactions.create!(
+      entry_reference: "t", status: "booked", occurred_on: Date.new(2026, 10, 1), amount: -800, currency: "EUR", transaction_category: @groceries)
+    mine = transaction("a", transaction_category: @groceries)
+
+    assert_equal 1, BankTransactions::Categorization.clear!(other_user, dry_run: true)
+    assert_equal @groceries, their_transaction.reload.transaction_category
+    assert_equal 1, BankTransactions::Categorization.clear!(other_user)
+    assert_nil their_transaction.reload.transaction_category
+    assert_equal @groceries, mine.reload.transaction_category
+  end
 end

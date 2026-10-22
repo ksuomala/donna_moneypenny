@@ -15,13 +15,13 @@ class TransactionCategory < ApplicationRecord
 
   KINDS = kinds.keys + [ "excluded" ]
 
-  # Creates or updates a category by name (categories:upsert and categories:import). kind is
-  # expense, income, investment or excluded (no kind, left out of stats). Attributes given as
-  # nil keep their current value, so a description can be changed on its own. A new
-  # sub-category takes its parent's kind unless one is given.
-  def self.define!(name:, kind: nil, parent: nil, description: nil)
-    category = find_or_initialize_by(name: name)
-    category.parent = parent.is_a?(self) ? parent : find_by!(name: parent) unless parent.nil?
+  # Creates or updates one of the user's categories by name (categories:upsert and
+  # categories:import). kind is expense, income, investment or excluded (no kind, left out of
+  # stats). Attributes given as nil keep their current value, so a description can be changed
+  # on its own. A new sub-category takes its parent's kind unless one is given.
+  def self.define!(name:, kind: nil, parent: nil, description: nil, user: Current.user || User.owner)
+    category = where(user: user).find_or_initialize_by(name: name)
+    category.parent = parent.is_a?(self) ? parent : where(user: user).find_by!(name: parent) unless parent.nil?
     if kind.nil? && category.new_record? && category.parent
       kind = category.parent.exclude_from_stats? ? "excluded" : category.parent.kind
     end
@@ -37,12 +37,12 @@ class TransactionCategory < ApplicationRecord
 
   # Defines categories from the categories:import format: a list of hashes with name, kind,
   # description and optional children (name, description). Nothing is deleted.
-  def self.import!(definitions)
+  def self.import!(definitions, user: Current.user || User.owner)
     transaction do
       definitions.flat_map do |attributes|
-        parent = define!(name: attributes.fetch("name"), kind: attributes["kind"], description: attributes["description"])
+        parent = define!(name: attributes.fetch("name"), kind: attributes["kind"], description: attributes["description"], user: user)
         children = Array(attributes["children"]).map do |child|
-          define!(name: child.fetch("name"), parent: parent, description: child["description"])
+          define!(name: child.fetch("name"), parent: parent, description: child["description"], user: user)
         end
         [ parent, *children ]
       end

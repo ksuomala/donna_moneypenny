@@ -153,6 +153,22 @@ class BankTransactions::SyncTest < ActiveSupport::TestCase
     assert_equal 2, @account.balances.count
   end
 
+  test "a Danish account's transactions and balance are stored in euros with the bank's figures kept" do
+    ExchangeRate.create!(currency: "DKK", on: Date.new(2026, 10, 1), rate: "7.46")
+    ExchangeRate.create!(currency: "DKK", on: Time.find_zone("Europe/Helsinki").today, rate: "7.50")
+    @account.update!(currency: "DKK")
+    danish = txn("a", amount: "746.00", "transaction_amount" => { "amount" => "746.00", "currency" => "DKK" })
+    balances = [ { "balance_type" => "ITAV", "balance_amount" => { "amount" => "1500.00", "currency" => "DKK" } } ]
+
+    BankTransactions::Sync.new(@account, client: PagedClient.new([ danish ], balances: balances), conversion: BankTransactions::Conversion.new(client: Object.new)).call
+
+    transaction = @account.bank_transactions.sole
+    assert_equal [ BigDecimal("-100.00"), "EUR", BigDecimal("-746.00"), "DKK" ], transaction.values_at(:amount, :currency, :source_amount, :source_currency)
+    balance = @account.balances.sole
+    assert_equal [ BigDecimal("200.00"), BigDecimal("200.00"), BigDecimal("1500.00"), BigDecimal("1500.00"), "DKK" ],
+                 balance.values_at(:booked, :available, :source_booked, :source_available, :source_currency)
+  end
+
   test "a balances response without a usable balance records nothing" do
     client = PagedClient.new([ txn("a") ], balances: [ { "balance_type" => "OTHR", "balance_amount" => { "amount" => "100.00", "currency" => "EUR" } } ])
 

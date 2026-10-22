@@ -65,20 +65,22 @@ module BankTransactions
     # Identifies the prompt text a run was made with.
     def self.prompt_version = Digest::SHA256.hexdigest(prompt).first(12)
 
-    # Identifies the rules a run was made with: the categories and their descriptions.
-    def self.rules_digest
-      Digest::SHA256.hexdigest(TransactionCategory.order(:id).pluck(:id, :name, :parent_id, :description).to_json).first(12)
+    # Identifies the rules a run was made with: the user's categories and their descriptions.
+    def self.rules_digest(user = User.owner)
+      Digest::SHA256.hexdigest(TransactionCategory.where(user: user).order(:id).pluck(:id, :name, :parent_id, :description).to_json).first(12)
     end
 
     # excluding: transaction ids to hide from the context (the evaluation sends categorized
     # transactions as if they were new, and their own decisions must not be visible).
-    # client: a stand-in for the provider's client, in tests.
-    def initialize(excluding: [], model: Rails.configuration.x.categorizer.model, effort: Rails.configuration.x.categorizer.effort, client: nil)
+    # client: a stand-in for the provider's client, in tests. user: whose transactions, categories
+    # and loans; the owner's until the categorizer runs per user.
+    def initialize(excluding: [], model: Rails.configuration.x.categorizer.model, effort: Rails.configuration.x.categorizer.effort, client: nil, user: User.owner)
       @excluding = excluding
       @model = model
+      @user = user
       @backend = self.class.backend_for(model).new(model: model, effort: effort, client: client)
-      @context = Categorization.context(excluding: excluding)
-      @precedents = Categorization.known_decisions(excluding: excluding).map { |name, account_id, category_id, _| [ name, account_id, category_id ] }.to_set
+      @context = Categorization.context(excluding: excluding, user: user)
+      @precedents = Categorization.known_decisions(excluding: excluding, user: user).map { |name, account_id, category_id, _| [ name, account_id, category_id ] }.to_set
     end
 
     attr_reader :context
@@ -86,11 +88,11 @@ module BankTransactions
     # Decides one batch. Raises Truncated or Refused when there is no usable answer.
     def call(transactions)
       transactions = transactions.to_a
-      hints = Categorization.pairing_hints(transactions, hide: @excluding)
-      categories = TransactionCategory.includes(:children, :parent).reject { |c| c.children.any? }
+      hints = Categorization.pairing_hints(transactions, hide: @excluding, user: @user)
+      categories = TransactionCategory.where(user: @user).includes(:children, :parent).reject { |c| c.children.any? }
 
       response = @backend.decide(prompt: self.class.prompt, context: @context, user_message: user_message(transactions, hints),
-                                 transactions: transactions, categories: categories, loans: Loan.order(:id).to_a)
+                                 transactions: transactions, categories: categories, loans: Loan.where(user: @user).order(:id).to_a)
 
       Result.new(verdicts: verdicts(response.decisions, transactions, hints), usage: response.usage, model: response.model.presence || @model.to_s)
     end
@@ -102,7 +104,7 @@ module BankTransactions
 
       lines << "" << "# possible other sides (same amount the other way round on another account within 5 days): " \
                      "transaction id, other id, other account id, status, date, amount, counterparty, bank code, category"
-      names = TransactionCategory.pluck(:id, :name).to_h
+      names = TransactionCategory.where(user: @user).pluck(:id, :name).to_h
       transactions.each do |t|
         hints.fetch(t.id, []).each do |other|
           category = @excluding.include?(other.id) ? nil : names[other.transaction_category_id]
@@ -118,8 +120,8 @@ module BankTransactions
     # Applies the guardrails. Decisions for ids outside the batch are dropped, the first decision
     # per id wins, and a transaction the model left out becomes unsure.
     def verdicts(decisions, transactions, hints)
-      categories = TransactionCategory.includes(:children).index_by(&:id)
-      loan_ids = Loan.pluck(:id).to_set
+      categories = TransactionCategory.where(user: @user).includes(:children).index_by(&:id)
+      loan_ids = Loan.where(user: @user).pluck(:id).to_set
       by_id = transactions.index_by(&:id)
       verdicts = {}
 

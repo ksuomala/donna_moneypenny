@@ -140,4 +140,15 @@ class CategorizeTransactionsJobTest < ActiveJob::TestCase
 
     assert_empty CategorizationRun.all
   end
+
+  test "only the owner's transactions are decided until the categorizer runs per user" do
+    theirs = BankConnection.create!(user: User.where.not(id: User.owner.id).first, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
+    other = theirs.bank_accounts.create!(uid: "acc-2", currency: "EUR")
+    other.bank_transactions.create!(entry_reference: "x", status: "booked", occurred_on: Date.new(2026, 10, 1), amount: -5, currency: "EUR", counterparty_name: "K-Market")
+    mine = transaction("a")
+
+    run_all(stub)
+
+    assert_equal [ mine.id ], CategorizationDecision.pluck(:bank_transaction_id)
+  end
 end

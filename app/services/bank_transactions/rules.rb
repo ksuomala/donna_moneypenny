@@ -14,16 +14,17 @@ module BankTransactions
       { retired: retire!, derived: derive!, applied: apply! }
     end
 
-    # Fills in the category, and the loan where missing, of uncategorized booked transactions
-    # that an active rule matches. The first matching rule (manual before derived) wins.
-    # Returns rule => count; dry_run counts without writing.
+    # Fills in the category, and the loan where missing, of the owner's uncategorized booked
+    # transactions that an active rule matches (the rules are the owner's, so other users'
+    # transactions wait until this runs per user). The first matching rule (manual before
+    # derived) wins. Returns rule => count; dry_run counts without writing.
     def self.apply!(dry_run: false)
       rules = CategorizationRule.active.in_order.includes(:transaction_category).to_a
       return Applied.new({}, 0) if rules.empty?
 
       categorized = Hash.new(0)
       linked = 0
-      BankTransaction.booked.where(transaction_category_id: nil).find_each do |t|
+      User.owner.bank_transactions.booked.where(transaction_category_id: nil).find_each do |t|
         rule = rules.find { |r| r.matches?(t) } or next
         categorized[rule] += 1
         linked += 1 if rule.loan_id && t.loan_id.nil?
@@ -48,7 +49,7 @@ module BankTransactions
     def self.derive_by_reference(dry_run)
       covered = CategorizationRule.pluck(:reference).compact.to_set
       prefixes = CategorizationRule.active.pluck(:reference_prefix).compact
-      groups = BankTransaction.booked.where.not(transaction_category_id: nil).where.not(reference_number: [ nil, "" ])
+      groups = User.owner.bank_transactions.booked.where.not(transaction_category_id: nil).where.not(reference_number: [ nil, "" ])
         .pluck(:reference_number, :transaction_category_id, :loan_id, :bank_account_id)
         .group_by { |ref, *| CategorizationRule.normalize_reference(ref) }
 
@@ -74,7 +75,7 @@ module BankTransactions
     def self.derive_by_amount(dry_run, new_reference_rules)
       covered = CategorizationRule.where.not(counterparty: nil).where.not(amount: nil).pluck(:counterparty, :amount).map { |c, a| [ c.downcase, a ] }.to_set
       reference_rules = (CategorizationRule.active.where(counterparty: nil, amount: nil).to_a + new_reference_rules).uniq
-      groups = BankTransaction.booked.where.not(transaction_category_id: nil).where.not(counterparty_name: [ nil, "" ]).to_a
+      groups = User.owner.bank_transactions.booked.where.not(transaction_category_id: nil).where.not(counterparty_name: [ nil, "" ]).to_a
         .group_by { |t| [ t.counterparty_name.squish.downcase, t.amount ] }
 
       groups.filter_map do |(name, amount), rows|
@@ -122,7 +123,7 @@ module BankTransactions
     end
 
     def self.candidates(rule)
-      scope = BankTransaction.booked
+      scope = User.owner.bank_transactions.booked
       scope = scope.where(bank_account_id: rule.bank_account_id) if rule.bank_account_id
       return scope.where(amount: rule.amount).where("LOWER(counterparty_name) = ?", rule.counterparty.downcase) if rule.amount && rule.counterparty
 

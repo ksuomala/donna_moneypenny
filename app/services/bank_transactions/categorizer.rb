@@ -107,7 +107,7 @@ module BankTransactions
         hints.fetch(t.id, []).each do |other|
           category = @excluding.include?(other.id) ? nil : names[other.transaction_category_id]
           lines << Categorization.row(t.id, other.id, other.bank_account_id, other.status, other.occurred_on, other.amount.to_s("F"),
-                                      other.counterparty_name, other.raw&.dig("bank_transaction_code", "description"), category)
+                                      other.counterparty_name, other.bank_code, category)
         end
       end
       lines.join("\n")
@@ -183,7 +183,7 @@ module BankTransactions
         elsif transaction.amount.abs > LARGE_AMOUNT && !@precedents.include?([ transaction.counterparty_name, transaction.bank_account_id, category.id ])
           # An Own transfer can be backed by its other side instead (confirm_large_own_transfers).
           confidence, guard = "unsure", category.name == "Own" && others.any? ? PAIR_PENDING : "large amount without precedent"
-        elsif category.name == "Own" && others.empty? && transaction.raw&.dig("bank_transaction_code", "description") != "Oma siirto"
+        elsif category.name == "Own" && others.empty? && transaction.bank_code != "Oma siirto"
           confidence, guard = "unsure", "own transfer without other side"
         end
       end

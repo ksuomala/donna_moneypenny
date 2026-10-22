@@ -153,8 +153,8 @@ class BankTransactions::SyncTest < ActiveSupport::TestCase
     assert_equal 2, @account.balances.count
   end
 
-  test "a balances response without a booked balance records nothing" do
-    client = PagedClient.new([ txn("a") ], balances: [ { "balance_type" => "ITAV", "balance_amount" => { "amount" => "100.00", "currency" => "EUR" } } ])
+  test "a balances response without a usable balance records nothing" do
+    client = PagedClient.new([ txn("a") ], balances: [ { "balance_type" => "OTHR", "balance_amount" => { "amount" => "100.00", "currency" => "EUR" } } ])
 
     BankTransactions::Sync.new(@account, client: client).call
 

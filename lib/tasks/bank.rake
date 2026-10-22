@@ -1,7 +1,7 @@
 namespace :bank do
-  desc "Fetch new transactions and today's balances for every account, like the daily job"
+  desc "Fetch new transactions and today's balances for every account, like the daily job; ACCOUNT=5 for one account only"
   task sync: :environment do
-    SyncBankTransactionsJob.perform_now
+    SyncBankTransactionsJob.perform_now(account_id: ENV["ACCOUNT"].presence&.to_i)
   end
 end
 
@@ -21,7 +21,7 @@ namespace :accounts do
     puts "# id, date, amount, counterparty, description, bank code, category, balance after"
     rows.each do |t|
       running += t.amount if running
-      puts [ t.id, t.occurred_on, t.amount.to_s("F"), t.counterparty_name, t.description, t.raw&.dig("bank_transaction_code", "description"),
+      puts [ t.id, t.occurred_on, t.amount.to_s("F"), t.counterparty_name, t.description, t.bank_code,
              names[t.transaction_category_id], running&.to_s("F") ].map { |v| v.to_s.squish }.join("\t")
     end
   end

@@ -13,13 +13,14 @@ class BankAccountBalance < ApplicationRecord
   AVAILABLE_TYPES = %w[ITAV CLAV FWAV].freeze
 
   # Maps the "balances" array of GET /accounts/{uid}/balances to our columns, or nil when the
-  # bank reported no booked balance.
+  # bank reported neither. Revolut reports only an available balance; with nothing pending it
+  # is the booked balance too, so it stands in for it.
   def self.attributes_from_api(balances)
     by_type = balances.index_by { |balance| balance["balance_type"] }
-    booked = BOOKED_TYPES.filter_map { |type| by_type[type] }.first
+    available = AVAILABLE_TYPES.filter_map { |type| by_type[type] }.first
+    booked = BOOKED_TYPES.filter_map { |type| by_type[type] }.first || available
     return unless booked
 
-    available = AVAILABLE_TYPES.filter_map { |type| by_type[type] }.first
     {
       booked: BigDecimal(booked.dig("balance_amount", "amount").to_s),
       available: available && BigDecimal(available.dig("balance_amount", "amount").to_s),

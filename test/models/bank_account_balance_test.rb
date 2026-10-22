@@ -18,8 +18,15 @@ class BankAccountBalanceTest < ActiveSupport::TestCase
     assert_nil attributes[:available]
   end
 
-  test "is nothing without a booked balance" do
-    assert_nil BankAccountBalance.attributes_from_api([ balance("ITAV", "100.00") ])
+  test "an available balance alone stands in for the booked one" do
+    attributes = BankAccountBalance.attributes_from_api([ balance("ITAV", "100.00") ])
+
+    assert_equal BigDecimal("100.00"), attributes[:booked]
+    assert_equal BigDecimal("100.00"), attributes[:available]
+  end
+
+  test "is nothing without a booked or available balance" do
+    assert_nil BankAccountBalance.attributes_from_api([ balance("OTHR", "100.00") ])
     assert_nil BankAccountBalance.attributes_from_api([])
   end
 

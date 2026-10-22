@@ -4,7 +4,9 @@
 class SyncBankTransactionsJob < ApplicationJob
   queue_as :default
 
-  def perform
+  # With account_id only that account is fetched (bin/rails bank:sync ACCOUNT=5), to redo one
+  # account without spending the others' daily fetches.
+  def perform(account_id: nil)
     failures = []
 
     BankConnection.active.includes(:bank_accounts).find_each do |connection|
@@ -15,6 +17,8 @@ class SyncBankTransactionsJob < ApplicationJob
       end
 
       connection.bank_accounts.each do |account|
+        next if account_id && account.id != account_id
+
         new_count = BankTransactions::Sync.new(account).call
         Rails.logger.info("[bank sync] #{account.display_name}: #{new_count} new booked transaction(s)")
       rescue StandardError => e

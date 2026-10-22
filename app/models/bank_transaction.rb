@@ -34,6 +34,13 @@ class BankTransaction < ApplicationRecord
     }
   end
 
+  # The bank's own type for the transaction, as text: Nordea describes it ("Oma siirto"),
+  # Revolut only codes it ("TOPUP", "ATM", "CARD_PAYMENT").
+  def bank_code
+    code = raw&.dig("bank_transaction_code")
+    code&.dig("description").presence || code&.dig("code").presence
+  end
+
   private
 
   # Categories with sub-categories (like Investment) only group them; transactions go on a sub-category.

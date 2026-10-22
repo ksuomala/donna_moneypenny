@@ -63,7 +63,7 @@ module BankTransactions
     # One transaction as the tab-separated line the listings and the categorizer use.
     def self.transaction_row(t)
       row(t.id, t.bank_account_id, t.occurred_on, t.amount.to_s("F"), t.currency, t.counterparty_name,
-          t.description, t.reference_number, t.merchant_category_code, t.raw&.dig("bank_transaction_code", "description"))
+          t.description, t.reference_number, t.merchant_category_code, t.bank_code)
     end
 
     # The oldest uncategorized booked transactions.
@@ -88,7 +88,7 @@ module BankTransactions
                 "# id, account id, date, amount, counterparty, description, reference, bank code" ]
       scope.order(:occurred_on, :id).each do |t|
         lines << row(t.id, t.bank_account_id, t.occurred_on, t.amount.to_s("F"), t.counterparty_name, t.description,
-                     t.reference_number, t.raw&.dig("bank_transaction_code", "description"))
+                     t.reference_number, t.bank_code)
       end
 
       lines << "" << "# linked so far: loan, account id, counterparty, count"

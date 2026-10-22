@@ -41,6 +41,14 @@ class SyncBankTransactionsJobTest < ActiveJob::TestCase
     assert_equal [ 100, 100 ], [ @first, @second ].map(&:balance)
   end
 
+  test "syncs one account only when asked" do
+    with_client(StubClient.new) { SyncBankTransactionsJob.perform_now(account_id: @second.id) }
+
+    assert_equal 0, @first.bank_transactions.count
+    assert_equal 1, @second.bank_transactions.count
+    assert_nil @first.last_synced_at
+  end
+
   test "each connection is read with the app it was made with" do
     theirs = create_enable_banking_app(users(:two))
     other = BankConnection.create!(user: users(:two), session_id: "s2", aspsp_name: "Nordea", aspsp_country: "FI",

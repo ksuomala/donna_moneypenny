@@ -20,6 +20,28 @@ class BankConnectionTest < ActiveSupport::TestCase
     assert_equal [ "acc" ], BankAccount.deposit.pluck(:uid)
   end
 
+  test "currency pockets sharing one IBAN are separate accounts, matched by IBAN and currency on reconnect" do
+    @connection.attach_account!(account("dkk", "CACC", hash: nil, "account_id" => { "iban" => "LT123" }, "currency" => "DKK"))
+    @connection.attach_account!(account("eur", "CACC", hash: nil, "account_id" => { "iban" => "LT123" }, "currency" => "EUR"))
+    @connection.attach_account!(account("eur-2", "CACC", hash: nil, "account_id" => { "iban" => "LT123" }, "currency" => "EUR"))
+
+    assert_equal %w[DKK EUR], BankAccount.order(:currency).pluck(:currency)
+    assert_equal "eur-2", BankAccount.find_by!(currency: "EUR").uid
+  end
+
+  test "reattaching from the stored session adds the accounts that were lost and keeps the rest" do
+    dkk = account("dkk", "CACC", "account_id" => { "iban" => "LT123" }, "currency" => "DKK")
+    eur = account("eur", "CACC", "account_id" => { "iban" => "LT123" }, "currency" => "EUR")
+    @connection.update!(raw: { "accounts" => [ dkk, eur ] })
+    @connection.attach_account!(eur)
+    existing = BankAccount.find_by!(uid: "eur")
+
+    @connection.reattach_accounts!
+
+    assert_equal %w[dkk eur], @connection.bank_accounts.order(:uid).pluck(:uid)
+    assert_equal existing, BankAccount.find_by!(uid: "eur")
+  end
+
   test "reconnecting keeps the account's type" do
     @connection.attach_account!(account("card", "CARD"))
     @connection.attach_account!(account("card-2", "CARD", hash: "h-card"))

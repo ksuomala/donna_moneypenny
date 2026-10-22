@@ -3,6 +3,18 @@ namespace :bank do
   task sync: :environment do
     SyncBankTransactionsJob.perform_now(account_id: ENV["ACCOUNT"].presence&.to_i)
   end
+
+  desc "Attach the accounts of every active connection again from its stored session (CONNECTION=3 for one), " \
+       "adding the ones an older matching rule lost; existing accounts are kept"
+  task attach_accounts: :environment do
+    scope = ENV["CONNECTION"].present? ? BankConnection.where(id: ENV["CONNECTION"]) : BankConnection.active
+    scope.find_each do |connection|
+      before = connection.bank_accounts.count
+      connection.reattach_accounts!
+      puts "#{connection.aspsp_name} (#{connection.id}): #{connection.bank_accounts.count - before} account(s) added, " \
+           "#{connection.bank_accounts.count} on the connection"
+    end
+  end
 end
 
 namespace :accounts do

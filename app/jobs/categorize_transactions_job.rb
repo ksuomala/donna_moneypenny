@@ -19,7 +19,7 @@ class CategorizeTransactionsJob < ApplicationJob
   def perform(user_id: nil, run_id: nil, ids: nil, limit: nil, batch_size: nil)
     unless BankTransactions::Categorizer.configured?
       Rails.logger.info("[categorizer] no API key for #{config.model} (see bin/rails credentials:edit), skipping")
-      BudgetAlertsJob.perform_later if run_id.nil? && user_id.nil?
+      ReportsJob.perform_later if run_id.nil? && user_id.nil?
       return
     end
     if run_id.nil? && user_id.nil?
@@ -28,7 +28,7 @@ class CategorizeTransactionsJob < ApplicationJob
     end
 
     run, ids = run_id ? [ CategorizationRun.find(run_id), ids ] : start(User.find(user_id), limit: limit)
-    return BudgetAlertsJob.perform_later if run.finished?
+    return ReportsJob.perform_later if run.finished?
 
     batch_size ||= config.batch_size
     batch, rest = ids.first(batch_size), ids.drop(batch_size)
@@ -37,7 +37,7 @@ class CategorizeTransactionsJob < ApplicationJob
       self.class.perform_later(run_id: run.id, ids: rest, batch_size: batch_size)
     else
       run.update!(finished_at: Time.current)
-      BudgetAlertsJob.perform_later
+      ReportsJob.perform_later
     end
   rescue BankTransactions::Categorizer::Truncated => e
     raise if batch_size == 1

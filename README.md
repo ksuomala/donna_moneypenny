@@ -70,12 +70,13 @@ does nothing.
 
 ## Telegram
 
-A bot can send a weekly report on Monday mornings (last week's income, expenses and top
-categories, and this month against the budget) and a message when a budget row passes 80 and
-100 % of its monthly amount, once per month each, checked after the nightly categorizer. A user
-and a household each have a chat of their own; a household without one is reached through its
-members' chats. Any bot's token works, also one another program already uses for its own chat:
-sending doesn't interfere with receiving.
+A bot sends the reports after each sync, once the categorizer has run on the new
+transactions: a weekly report on the first sync of the week (last week's income, expenses and
+top categories, and this month against the budget), and one message when the month's spending
+passes 50 and 100 % of the budget's monthly total, each once per month. A user and a household
+each have a chat of their own; a household without one is reached through its members' chats.
+Any bot's token works, also one another program already uses for its own chat: sending doesn't
+interfere with receiving.
 
 ```sh
 bin/rails credentials:edit                                 # add telegram: bot_token: ...
@@ -86,7 +87,7 @@ bin/rails telegram:weekly_report DRY_RUN=1                 # print instead of se
 bin/rails telegram:budget_alerts DRY_RUN=1
 ```
 
-`BUDGET_ALERT_THRESHOLDS` (default `80,100`) sets the percentages.
+`BUDGET_ALERT_THRESHOLDS` (default `50,100`) sets the percentages.
 
 ## Users
 

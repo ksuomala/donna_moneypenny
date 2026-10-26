@@ -73,4 +73,26 @@ class Telegram::WeeklyReportTest < ActiveSupport::TestCase
 
     assert_includes Telegram::WeeklyReport.new(@user, today: @today).text, "• Bits &amp; Bobs 10,00 €"
   end
+
+  test "due once a week: when nothing was sent since Monday, and a send records the time" do
+    monday = Date.new(2026, 10, 19)
+    report = Telegram::WeeklyReport.new(@user, today: monday)
+    assert report.due?
+
+    @user.update!(weekly_report_sent_at: Time.find_zone("Europe/Helsinki").local(2026, 10, 18, 19, 5))
+    assert report.due?, "last sent before this week's Monday"
+
+    @user.update!(weekly_report_sent_at: Time.find_zone("Europe/Helsinki").local(2026, 10, 19, 19, 5))
+    assert_not report.due?
+    assert_not Telegram::WeeklyReport.new(@user, today: monday + 6).due?
+    assert Telegram::WeeklyReport.new(@user, today: monday + 7).due?
+
+    @user.update!(weekly_report_sent_at: nil, telegram_chat_id: "111")
+    TelegramStub.with { report.send! }
+    assert_in_delta Time.current, @user.reload.weekly_report_sent_at, 5
+
+    @user.update!(weekly_report_sent_at: nil, telegram_chat_id: nil)
+    TelegramStub.with { report.send! }
+    assert_nil @user.reload.weekly_report_sent_at, "nothing sent, nothing recorded"
+  end
 end

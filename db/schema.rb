@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_26_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_26_120000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -243,6 +243,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_100000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "telegram_chat_id"
+    t.datetime "weekly_report_sent_at"
   end
 
   create_table "incomes", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -315,6 +316,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_100000) do
     t.datetime "updated_at", null: false
     t.bigint "household_id"
     t.string "telegram_chat_id"
+    t.datetime "weekly_report_sent_at"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
     t.index ["household_id"], name: "index_users_on_household_id"
   end

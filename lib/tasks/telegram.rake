@@ -16,8 +16,8 @@ namespace :telegram do
     puts "Sent to #{chats.join(", ")}"
   end
 
-  desc "The weekly report, as Monday's job sends it. EMAIL=... or HOUSEHOLD=name for one, otherwise everyone with a chat; " \
-       "DRY_RUN=1 prints it instead of sending"
+  desc "The weekly report, as the reports job sends it after the first sync of the week. EMAIL=... or HOUSEHOLD=name for one, " \
+       "otherwise everyone with a chat; DRY_RUN=1 prints it instead of sending (a real send counts as this week's)"
   task weekly_report: :environment do
     owners = ENV["EMAIL"] || ENV["HOUSEHOLD"] ? [ telegram_owner ] : Telegram::Chats.owners
     owners.each do |owner|
@@ -31,7 +31,7 @@ namespace :telegram do
     end
   end
 
-  desc "The budget alerts due now, as the nightly check sends them. DRY_RUN=1 prints them instead of sending (and doesn't record them)"
+  desc "The budget alerts due now, as the reports job sends them after each sync. DRY_RUN=1 prints them instead of sending (and doesn't record them)"
   task budget_alerts: :environment do
     alerts = Telegram::BudgetAlerts.new
     if ENV["DRY_RUN"].present?

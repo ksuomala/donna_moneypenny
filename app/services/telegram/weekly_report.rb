@@ -20,9 +20,20 @@ module Telegram
       [ week_section, budget_section ].compact.join("\n\n")
     end
 
-    # Sends to the owner's chats; returns the messages as Telegram describes them.
+    # Once a week: due when none has been sent since the start of this week (Monday), so the
+    # first sync of the week sends it and a missed day is caught up the next. A newly linked
+    # chat gets its first report at the next sync.
+    def due?
+      sent_at = owner.weekly_report_sent_at
+      sent_at.nil? || sent_at.in_time_zone(Format::TIME_ZONE).to_date < today.beginning_of_week
+    end
+
+    # Sends to the owner's chats and records the send; returns the messages as Telegram
+    # describes them.
     def send!(client: Client.for)
-      Chats.for(owner).map { |chat_id| client.send_message(chat_id: chat_id, text: text) }
+      Chats.for(owner).map { |chat_id| client.send_message(chat_id: chat_id, text: text) }.tap do |sent|
+        owner.update!(weekly_report_sent_at: Time.current) if sent.any?
+      end
     end
 
     private

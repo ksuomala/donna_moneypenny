@@ -26,7 +26,7 @@ module BankTransactions
     def call
       scope = @user.bank_transactions.booked.where.not(transaction_category_id: nil)
       scope = scope.where(occurred_on: @since..) if @since
-      order = @seed ? Arel.sql("RAND(#{Integer(@seed)})") : Arel.sql("RAND()")
+      order = @seed ? Arel.sql("RAND(?)", Integer(@seed)) : Arel.sql("RAND()")
       transactions = scope.order(order).limit(@sample).to_a
       ids = transactions.map(&:id)
 

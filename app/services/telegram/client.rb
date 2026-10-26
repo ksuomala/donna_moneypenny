@@ -24,14 +24,17 @@ module Telegram
     def send_message(chat_id:, text:)
       raise Error, "No Telegram bot token: add telegram: bot_token: with bin/rails credentials:edit, or set TELEGRAM_BOT_TOKEN" if @token.blank?
 
-      uri = URI.join(BASE_URL, "bot#{@token}/sendMessage")
       body = { chat_id: chat_id, text: text, parse_mode: "HTML", disable_web_page_preview: true }.to_json
-      response = Net::HTTP.post(uri, body, "Content-Type" => "application/json")
+      response = Net::HTTP.post(endpoint("sendMessage"), body, "Content-Type" => "application/json")
       raise Error, "Telegram sendMessage to chat #{chat_id} failed (#{response.code}): #{response.body.to_s.first(300)}" unless response.is_a?(Net::HTTPSuccess)
 
       JSON.parse(response.body).fetch("result")
     rescue JSON::ParserError, KeyError => e
       raise Error, "Unexpected Telegram response: #{e.message}"
     end
+
+    # A bot token has a colon in it ("123456:ABC-def"), so it is never joined onto the base URL
+    # as a relative path: URI.join would read everything before the colon as a scheme.
+    def endpoint(method) = URI.parse("#{BASE_URL}bot#{@token}/#{method}")
   end
 end

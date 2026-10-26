@@ -6,6 +6,7 @@ class Budget < ApplicationRecord
   belongs_to :user, optional: true
   belongs_to :household, optional: true
   has_many :lines, class_name: "BudgetLine", dependent: :destroy
+  has_many :alerts, class_name: "BudgetAlert", dependent: :destroy
 
   validates :starts_on, presence: true
   validates :monthly_total, numericality: { greater_than: 0 }, allow_nil: true

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_23_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_26_100000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -91,6 +91,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_120000) do
     t.index ["categorization_rule_id"], name: "index_bank_transactions_on_categorization_rule_id"
     t.index ["loan_id"], name: "index_bank_transactions_on_loan_id"
     t.index ["transaction_category_id"], name: "index_bank_transactions_on_transaction_category_id"
+  end
+
+  create_table "budget_alerts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "budget_id", null: false
+    t.string "row_name", null: false
+    t.date "month", null: false
+    t.integer "threshold", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["budget_id", "row_name", "month", "threshold"], name: "idx_on_budget_id_row_name_month_threshold_8b66f3ec61", unique: true
+    t.index ["budget_id"], name: "index_budget_alerts_on_budget_id"
   end
 
   create_table "budget_lines", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -231,6 +242,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_120000) do
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "telegram_chat_id"
   end
 
   create_table "incomes", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -302,6 +314,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_120000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "household_id"
+    t.string "telegram_chat_id"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
     t.index ["household_id"], name: "index_users_on_household_id"
   end
@@ -314,6 +327,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_120000) do
   add_foreign_key "bank_transactions", "categorization_rules", on_delete: :nullify
   add_foreign_key "bank_transactions", "loans"
   add_foreign_key "bank_transactions", "transaction_categories", on_delete: :nullify
+  add_foreign_key "budget_alerts", "budgets"
   add_foreign_key "budget_lines", "budgets"
   add_foreign_key "budgets", "households"
   add_foreign_key "budgets", "users"

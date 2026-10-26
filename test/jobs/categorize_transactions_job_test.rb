@@ -135,10 +135,17 @@ class CategorizeTransactionsJobTest < ActiveJob::TestCase
 
   test "does nothing without an API key" do
     transaction("a")
+    backend = BankTransactions::Categorizer::AnthropicBackend
+    stubbed_factory, api_key = backend.client_factory, backend.method(:api_key)
+    backend.client_factory = backend::DEFAULT_CLIENT_FACTORY
+    backend.define_singleton_method(:api_key) { nil }
 
-    perform_enqueued_jobs { CategorizeTransactionsJob.perform_later } unless BankTransactions::Categorizer::AnthropicBackend.api_key
+    perform_enqueued_jobs { CategorizeTransactionsJob.perform_later }
 
     assert_empty CategorizationRun.all
+  ensure
+    backend.client_factory = stubbed_factory if stubbed_factory
+    backend.define_singleton_method(:api_key, api_key) if api_key
   end
 
   test "every user with categories gets a run of their own, built from their own data, and only their categories are accepted" do

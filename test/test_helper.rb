@@ -15,6 +15,12 @@ ExchangeRates::Client.factory = -> { UnstubbedExchangeRates.new }
   backend.client_factory = -> { raise "#{backend.name} called without a stub client in a test" }
 end
 
+# Tests never reach Telegram: a send needs a stubbed client.
+class UnstubbedTelegram
+  def send_message(**) = raise("Telegram::Client called without a stub client in a test")
+end
+Telegram::Client.factory = -> { UnstubbedTelegram.new }
+
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers

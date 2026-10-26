@@ -68,6 +68,26 @@ bin/rails transactions:categorizer_runs            # every user's runs, tokens a
 Every task acts for the first user unless `EMAIL=...` names another. Without an API key the job
 does nothing.
 
+## Telegram
+
+A bot can send a weekly report on Monday mornings (last week's income, expenses and top
+categories, and this month against the budget) and a message when a budget row passes 80 and
+100 % of its monthly amount, once per month each, checked after the nightly categorizer. A user
+and a household each have a chat of their own; a household without one is reached through its
+members' chats. Any bot's token works, also one another program already uses for its own chat:
+sending doesn't interfere with receiving.
+
+```sh
+bin/rails credentials:edit                                 # add telegram: bot_token: ...
+bin/rails telegram:link EMAIL=you@example.com CHAT_ID=123  # your chat with the bot
+bin/rails telegram:link HOUSEHOLD=Home CHAT_ID=-456        # a group with the bot in it
+bin/rails telegram:test EMAIL=you@example.com
+bin/rails telegram:weekly_report DRY_RUN=1                 # print instead of send
+bin/rails telegram:budget_alerts DRY_RUN=1
+```
+
+`BUDGET_ALERT_THRESHOLDS` (default `80,100`) sets the percentages.
+
 ## Users
 
 Every page needs a sign-in (Rails' built-in authentication). There is no sign-up page and no

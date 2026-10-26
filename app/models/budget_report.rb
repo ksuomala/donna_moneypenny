@@ -6,8 +6,9 @@ class BudgetReport
   Row = Data.define(:name, :budget, :spent) do
     def left = budget - spent
     def over? = spent > budget
-    # Share of the budget used, capped for drawing.
-    def used = budget.zero? ? 0 : [ (spent * 100 / budget).round, 100 ].min
+    # Share of the budget used, in whole percent; used is capped for drawing.
+    def percent = budget.zero? ? 0 : (spent * 100 / budget).round
+    def used = [ percent, 100 ].min
   end
 
   attr_reader :budget, :range, :months

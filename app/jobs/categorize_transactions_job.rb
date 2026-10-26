@@ -5,7 +5,8 @@
 # accounts and earlier decisions: enqueued without arguments (after every sync) the job fans out
 # into one job per user with categories. The first job of a run picks the user's transactions and
 # creates the CategorizationRun; every job decides one batch, stores the decisions, applies the
-# confident ones when the categorizer is in apply mode, and enqueues the next batch.
+# confident ones when the categorizer is in apply mode, and enqueues the next batch. Once a
+# user's run is through (or there is no categorizer), the budget alerts are checked.
 class CategorizeTransactionsJob < ApplicationJob
   queue_as :default
   limits_concurrency to: 1, key: "categorizer"
@@ -18,6 +19,7 @@ class CategorizeTransactionsJob < ApplicationJob
   def perform(user_id: nil, run_id: nil, ids: nil, limit: nil, batch_size: nil)
     unless BankTransactions::Categorizer.configured?
       Rails.logger.info("[categorizer] no API key for #{config.model} (see bin/rails credentials:edit), skipping")
+      BudgetAlertsJob.perform_later if run_id.nil? && user_id.nil?
       return
     end
     if run_id.nil? && user_id.nil?
@@ -26,12 +28,17 @@ class CategorizeTransactionsJob < ApplicationJob
     end
 
     run, ids = run_id ? [ CategorizationRun.find(run_id), ids ] : start(User.find(user_id), limit: limit)
-    return if run.finished?
+    return BudgetAlertsJob.perform_later if run.finished?
 
     batch_size ||= config.batch_size
     batch, rest = ids.first(batch_size), ids.drop(batch_size)
     decide(run, batch)
-    rest.any? ? self.class.perform_later(run_id: run.id, ids: rest, batch_size: batch_size) : run.update!(finished_at: Time.current)
+    if rest.any?
+      self.class.perform_later(run_id: run.id, ids: rest, batch_size: batch_size)
+    else
+      run.update!(finished_at: Time.current)
+      BudgetAlertsJob.perform_later
+    end
   rescue BankTransactions::Categorizer::Truncated => e
     raise if batch_size == 1
 

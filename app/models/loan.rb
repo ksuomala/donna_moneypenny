@@ -1,8 +1,10 @@
 class Loan < ApplicationRecord
+  include OwnedByUser
+
   has_many :balances, class_name: "LoanBalance", dependent: :destroy
   has_many :bank_transactions, dependent: :nullify
 
-  validates :name, presence: true, uniqueness: true
+  validates :name, presence: true, uniqueness: { scope: :user_id }
   validates :creditor, :currency, presence: true
 
   # What we owe on a given day, or nil before the first balance we know of.

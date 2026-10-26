@@ -9,15 +9,15 @@ module EnableBanking
 
     Error = Class.new(StandardError)
 
-    # Controllers get their client through Client.build so tests can swap in a fake.
-    class_attribute :factory, default: -> { new }
+    # Every user has their own Enable Banking application (EnableBankingApp); the app's key signs
+    # the requests. Callers get their client through Client.for so tests can swap in a fake.
+    class_attribute :factory, default: ->(app) { new(application_id: app&.application_id, private_key: app&.private_key) }
 
-    def self.build
-      factory.call
+    def self.for(app)
+      factory.call(app)
     end
 
-    def initialize(application_id: Rails.application.credentials.dig(:enable_banking, :application_id),
-                    private_key: Rails.application.credentials.dig(:enable_banking, :private_key))
+    def initialize(application_id:, private_key:)
       raise Error, "Enable Banking credentials are not configured" if application_id.blank? || private_key.blank?
 
       @application_id = application_id

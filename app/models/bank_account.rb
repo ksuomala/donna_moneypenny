@@ -7,6 +7,8 @@ class BankAccount < ApplicationRecord
 
   validates :uid, presence: true, uniqueness: true
 
+  scope :owned_by, ->(user) { joins(:bank_connection).where(bank_connections: { user_id: user }) }
+
   # Current and savings accounts, i.e. not credit cards.
   scope :deposit, -> { where(type: [ nil, "BankAccount" ]) }
 

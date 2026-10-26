@@ -1,14 +1,22 @@
 <% content_for :title, "Bank connections · Donna Moneypenny" %>
 
 <main class="page">
-  <nav class="page-nav"><%= link_to "Stats", stats_path %></nav>
+  <nav class="page-nav"><%= link_to "Stats", stats_path %> · <%= link_to "Enable Banking", enable_banking_app_path %><%= button_to "Sign out", session_path, method: :delete, class: "link-button", form_class: "button-to" %></nav>
 
   <h1>Bank connections</h1>
 
   <% if notice %><p class="flash flash-notice"><%= notice %></p><% end %>
   <% if alert %><p class="flash flash-alert"><%= alert %></p><% end %>
 
-  <%= button_to "Connect Nordea", enable_banking_authorization_path, class: "button", data: { turbo: false } %>
+  <% if Current.user.enable_banking_app&.configured? %>
+    <div class="connect-buttons">
+      <% EnableBanking::Bank.all.each do |bank| %>
+        <%= button_to "Connect #{bank.name}", enable_banking_authorization_path, params: { bank: bank.key }, class: "button", data: { turbo: false } %>
+      <% end %>
+    </div>
+  <% else %>
+    <p>To connect a bank, first <%= link_to "set up your Enable Banking application", enable_banking_app_path %>.</p>
+  <% end %>
 
   <% if @connections.empty? %>
     <p class="muted">No banks connected yet.</p>

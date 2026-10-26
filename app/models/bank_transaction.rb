@@ -2,13 +2,17 @@ class BankTransaction < ApplicationRecord
   belongs_to :bank_account
   belongs_to :transaction_category, optional: true
   belongs_to :loan, optional: true
+  has_many :categorization_decisions, dependent: :delete_all
+  # The rule that set the category, if one did (BankTransactions::Rules).
+  belongs_to :categorization_rule, optional: true
 
   enum :status, { booked: 0, pending: 1 }
 
   validate :category_has_no_sub_categories
 
   # Maps one Enable Banking transaction to our columns. Amounts are signed:
-  # money out (DBIT) is negative, money in (CRDT) positive.
+  # money out (DBIT) is negative, money in (CRDT) positive. The amount is in the bank's
+  # currency here; the sync converts it to euros (BankTransactions::Conversion).
   def self.attributes_from_api(transaction)
     debit = transaction["credit_debit_indicator"] == "DBIT"
     amount = BigDecimal(transaction.dig("transaction_amount", "amount").to_s)
@@ -29,6 +33,13 @@ class BankTransaction < ApplicationRecord
       merchant_category_code: transaction["merchant_category_code"].presence,
       raw: transaction
     }
+  end
+
+  # The bank's own type for the transaction, as text: Nordea describes it ("Oma siirto"),
+  # Revolut only codes it ("TOPUP", "ATM", "CARD_PAYMENT").
+  def bank_code
+    code = raw&.dig("bank_transaction_code")
+    code&.dig("description").presence || code&.dig("code").presence
   end
 
   private

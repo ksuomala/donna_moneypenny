@@ -1,16 +1,18 @@
 module StatsHelper
-  # The pie palette has eight colors; past that the smallest categories fold into "Other".
-  PIE_COLORS = 8
+  # The pie palette has nine colors; past that the smallest categories fold into "Other".
+  PIE_COLORS = 9
 
   PieSlice = Data.define(:name, :amount, :color)
 
-  def euros(amount)
-    number_to_currency(amount, unit: "€", format: "%n %u", separator: ",", delimiter: " ")
+  # An amount (stored in euros) in the page's display currency (@currency, euros by default).
+  def money(amount)
+    currency = @currency || DisplayCurrency.new(ExchangeRate::BASE)
+    number_to_currency(currency.convert(amount), unit: currency.unit, format: "%n %u", separator: ",", delimiter: " ")
   end
 
   # With an explicit sign, for changes: "+2 000,00 €", "−819,26 €".
-  def signed_euros(amount)
-    amount.zero? ? euros(0) : "#{amount.positive? ? "+" : "−"}#{euros(amount.abs)}"
+  def signed_money(amount)
+    amount.zero? ? money(0) : "#{amount.positive? ? "+" : "−"}#{money(amount.abs)}"
   end
 
   def share(amount, total)
@@ -49,13 +51,13 @@ module StatsHelper
       path = donut_segment(angle, [ sweep, 2 * Math::PI - 0.0001 ].min, radius, inner)
       angle += sweep
       tag.path(d: path, class: "pie-slice series-#{slice.color}") do
-        tag.title("#{slice.name}: #{euros(slice.amount)} (#{share(slice.amount, total)})")
+        tag.title("#{slice.name}: #{money(slice.amount)} (#{share(slice.amount, total)})")
       end
     end
 
     tag.svg(viewBox: "-102 -102 204 204", class: "pie", role: "img", "aria-label": "Pie chart") do
       safe_join(paths) +
-        tag.text(euros(total), x: 0, y: 5, "text-anchor": "middle", class: "pie-total")
+        tag.text(money(total), x: 0, y: 5, "text-anchor": "middle", class: "pie-total")
     end
   end
 

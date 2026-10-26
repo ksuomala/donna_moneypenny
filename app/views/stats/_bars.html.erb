@@ -1,5 +1,5 @@
 <section class="stats-section">
-  <h2><%= title %> <span class="muted"><%= euros(total) %></span></h2>
+  <h2><%= title %> <span class="muted"><%= money(total) %></span></h2>
 
   <% if slices.empty? %>
     <p class="muted">Nothing in this period.</p>
@@ -7,10 +7,10 @@
     <% max = slices.first.amount %>
     <ul class="bars">
       <% slices.each do |slice| %>
-        <li class="<%= class_names("bar-row", "bar-row-uncategorized": slice.uncategorized?) %>" title="<%= slice.name %>: <%= euros(slice.amount) %> (<%= share(slice.amount, total) %>)">
+        <li class="<%= class_names("bar-row", "bar-row-uncategorized": slice.uncategorized?) %>" title="<%= slice.name %>: <%= money(slice.amount) %> (<%= share(slice.amount, total) %>)">
           <span class="bar-label"><%= slice.name %><%= tag.span(" · net", class: "muted") if slice.investment? %></span>
           <span class="bar-track"><span class="bar" style="width: <%= (slice.amount * 100 / max).round(1) %>%"></span></span>
-          <span class="bar-value"><%= euros(slice.amount) %></span>
+          <span class="bar-value"><%= money(slice.amount) %></span>
         </li>
       <% end %>
     </ul>

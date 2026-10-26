@@ -1,18 +1,21 @@
 namespace :transactions do
-  desc "Print categories, accounts and known counterparty categories (read-only)"
+  # The tasks below work on the acting user's transactions (EMAIL=..., default the owner;
+  # lib/tasks/acting_user.rake).
+
+  desc "Print categories, accounts and known counterparty categories (read-only). EMAIL=... for another user"
   task categorization_context: :environment do
-    puts BankTransactions::Categorization.context
+    puts BankTransactions::Categorization.context(user: acting_user)
   end
 
-  desc "Print the oldest uncategorized booked transactions (read-only). LIMIT=200"
+  desc "Print the oldest uncategorized booked transactions (read-only). LIMIT=200 EMAIL=..."
   task uncategorized: :environment do
-    puts BankTransactions::Categorization.uncategorized(limit: Integer(ENV.fetch("LIMIT", "200")))
+    puts BankTransactions::Categorization.uncategorized(limit: Integer(ENV.fetch("LIMIT", "200")), user: acting_user)
   end
 
-  desc "Fill in missing categories. ASSIGN=\"transaction_id=category_id,...\" DRY_RUN=1 to preview"
+  desc "Fill in missing categories. ASSIGN=\"transaction_id=category_id,...\" DRY_RUN=1 to preview. EMAIL=... for another user"
   task categorize: :environment do
     dry_run = ENV["DRY_RUN"].present?
-    result = BankTransactions::Categorization.apply(BankTransactions::Categorization.parse(ENV.fetch("ASSIGN")), dry_run: dry_run)
+    result = BankTransactions::Categorization.apply(BankTransactions::Categorization.parse(ENV.fetch("ASSIGN")), dry_run: dry_run, user: acting_user)
     names = TransactionCategory.where(id: result.applied.values).pluck(:id, :name).to_h
 
     puts "#{dry_run ? "Would categorize" : "Categorized"} #{result.applied.size} transactions"
@@ -20,15 +23,35 @@ namespace :transactions do
     puts "Skipped (already categorized, pending or missing): #{result.skipped.join(", ")}" if result.skipped.any?
   end
 
-  desc "Print Loans-category transactions not linked to a loan yet (read-only)"
-  task unlinked_loans: :environment do
-    puts BankTransactions::Categorization.unlinked_loan_transactions
+  desc "Move transactions to another category, also ones already categorized (the user's explicit decision; a loan link is dropped). " \
+       "ASSIGN=\"transaction_id=category_id,...\" DRY_RUN=1 to preview. EMAIL=... for another user"
+  task recategorize: :environment do
+    dry_run = ENV["DRY_RUN"].present?
+    result = BankTransactions::Categorization.reassign(BankTransactions::Categorization.parse(ENV.fetch("ASSIGN")), dry_run: dry_run, user: acting_user)
+    names = TransactionCategory.where(id: result.applied.values).pluck(:id, :name).to_h
+
+    puts "#{dry_run ? "Would move" : "Moved"} #{result.applied.size} transactions"
+    result.applied.values.tally.sort_by { |_, count| -count }.each { |id, count| puts "  #{count}\t#{names[id]}" }
+    puts "Skipped (already there, pending or missing): #{result.skipped.join(", ")}" if result.skipped.any?
   end
 
-  desc "Link transactions to loans. ASSIGN=\"transaction_id=loan_id,...\" DRY_RUN=1 to preview"
+  desc "Take the category, rule and loan off every transaction of a user, to start over. EMAIL=... DRY_RUN=1 to preview"
+  task clear_categories: :environment do
+    user = User.find_by!(email_address: ENV.fetch("EMAIL").strip.downcase)
+    dry_run = ENV["DRY_RUN"].present?
+    count = BankTransactions::Categorization.clear!(user, dry_run: dry_run)
+    puts "#{dry_run ? "Would clear" : "Cleared"} #{count} transaction(s) of #{user.email_address}"
+  end
+
+  desc "Print Loans-category transactions not linked to a loan yet (read-only). EMAIL=... for another user"
+  task unlinked_loans: :environment do
+    puts BankTransactions::Categorization.unlinked_loan_transactions(user: acting_user)
+  end
+
+  desc "Link transactions to loans. ASSIGN=\"transaction_id=loan_id,...\" DRY_RUN=1 to preview. EMAIL=... for another user"
   task link_loans: :environment do
     dry_run = ENV["DRY_RUN"].present?
-    result = BankTransactions::Categorization.link_loans(BankTransactions::Categorization.parse(ENV.fetch("ASSIGN")), dry_run: dry_run)
+    result = BankTransactions::Categorization.link_loans(BankTransactions::Categorization.parse(ENV.fetch("ASSIGN")), dry_run: dry_run, user: acting_user)
     names = Loan.where(id: result.applied.values).pluck(:id, :name).to_h
 
     puts "#{dry_run ? "Would link" : "Linked"} #{result.applied.size} transactions"

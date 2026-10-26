@@ -14,12 +14,19 @@ Rails.application.routes.draw do
   get "terms" => "legal#terms", as: :terms
 
   namespace :enable_banking do
+    # The signed-in user's own Enable Banking application
+    resource :app, only: %i[show update]
     resource :authorization, only: :create
-    # Callback whitelisted as the redirect URL in the Enable Banking Control Panel
-    get "sessions", to: "sessions#create"
+    # Each app's own callback, whitelisted as that app's redirect URL in the Enable Banking Control Panel
+    get "sessions/:token", to: "sessions#create", as: :callback
   end
 
+  # Sign in and out. Users are created with bin/rails users:create; there is no sign-up page.
+  resource :session, only: %i[new create destroy]
+
   resource :stats, only: :show
+  # Budgets are created and edited on the stats page
+  resources :budgets, only: %i[create update destroy]
 
   root "bank_connections#index"
 end

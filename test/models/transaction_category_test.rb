@@ -99,4 +99,21 @@ class TransactionCategoryTest < ActiveSupport::TestCase
     assert TransactionCategory.find_by!(name: "Own").exclude_from_stats?
     assert TransactionCategory.find_by!(name: "Salary").income?
   end
+
+  test "define! works on the user's own categories, so two users can have the same name" do
+    other_user = User.where.not(id: User.owner.id).first
+    mine = TransactionCategory.define!(name: "Groceries", kind: "expense", description: "Mine")
+    theirs = TransactionCategory.define!(name: "Groceries", kind: "expense", description: "Theirs", user: other_user)
+
+    assert_not_equal mine, theirs
+    assert_equal [ User.owner, other_user ], [ mine.user, theirs.user ]
+    assert_equal "Theirs", TransactionCategory.define!(name: "Groceries", user: other_user).description
+    assert_equal "Mine", mine.reload.description
+
+    Current.user = other_user
+    assert_equal theirs, TransactionCategory.define!(name: "Groceries", description: "Updated")
+    assert_equal "Updated", theirs.reload.description
+  ensure
+    Current.reset
+  end
 end

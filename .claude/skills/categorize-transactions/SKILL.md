@@ -9,6 +9,22 @@ Assign a `TransactionCategory` to each uncategorized booked `BankTransaction`, s
 reports are right. Precision matters more than coverage: a transaction left uncategorized is
 harmless, one in the wrong category silently skews every report.
 
+Rules come first: references, reference prefixes and the same amount to the same counterparty
+(`CategorizationRule`), created from the history when they have been used consistently at least
+three times, and switched off automatically as soon as a categorization contradicts them. Then the
+app categorizes the rest by itself every night after the sync (`CategorizeTransactionsJob`, with
+a model through the API: OpenAI's GPT-6 Luna by default, `CATEGORIZER_MODEL` in
+`config/deploy.yml` picks another, Claude `claude-*` or TypeSafe `jev-*`). Every decision is
+stored. In production `CATEGORIZER_APPLY` is on, so the confident decisions are written to the
+transactions and the unsure ones are kept with a best guess; without it the job only stores
+decisions (shadow mode). This skill handles what the categorizer was unsure about, and keeps the
+rules it follows (the category descriptions) up to date.
+
+Everything is per user. Each user has their own categories, rules, loans and accounts, and the
+nightly rules pass and categorizer run once for every user who has categories, each run built
+from that user's data alone: nothing of one user's reaches another's model context, and a
+transfer between two users' accounts is not an own transfer for either.
+
 ## Commands
 
 All database access goes through `BankTransactions::Categorization`
@@ -17,6 +33,25 @@ database any other way (no `rails runner` updates, no console). Production is re
 Kamal. Drop the `bin/kamal app exec --reuse '…'` wrapper to run against the local database.
 
 ```sh
+# Read-only: the user's latest categorizer run's unsure decisions, grouped by counterparty, with
+# the model's guess, reason, and the guardrail that stopped it. The skill starts here.
+bin/kamal app exec --reuse 'bin/rails transactions:unsure'
+# Read-only: every user's categorizer runs with counts, tokens and cost
+bin/kamal app exec --reuse 'bin/rails transactions:categorizer_runs'
+# Run the categorizer now instead of waiting for the nightly sync: the user's backlog in the
+# background, ALL=1 for every user, DRY_RUN=1 for one batch printed and nothing stored
+bin/kamal app exec --reuse 'bin/rails transactions:categorizer_run'
+bin/kamal app exec --reuse 'bin/rails transactions:categorizer_run DRY_RUN=1 LIMIT=20'
+# Test the categorizer on the user's already categorized transactions (writes nothing; costs API
+# tokens). Run it after changing descriptions, before trusting the change.
+bin/kamal app exec --reuse 'bin/rails transactions:categorizer_eval SAMPLE=200'
+
+# Rules: every rule with its matches and conflicts; a manual rule (e.g. a loan's installment
+# reference prefix); switch one off or on
+bin/kamal app exec --reuse 'bin/rails rules:list'
+bin/kamal app exec --reuse 'bin/rails rules:upsert CATEGORY="Loans" LOAN="Mortgage" PREFIX="12345678"'
+bin/kamal app exec --reuse 'bin/rails rules:toggle ID=3'
+
 # Read-only: categories with their descriptions, accounts, and earlier decisions per counterparty
 bin/kamal app exec --reuse 'bin/rails transactions:categorization_context'
 
@@ -43,12 +78,20 @@ bin/kamal app exec --reuse 'bin/rails bank:sync'
 bin/kamal app exec --reuse 'bin/rails accounts:balances'
 ```
 
+Every task above works on the owner's data. For another user, add `EMAIL=their@address` to the
+command: every `transactions:*`, `rules:*` and `categories:*` task then acts for that user, on
+their transactions, categories, rules, loans and runs. `bank:sync` and `accounts:balances` cover
+every connection regardless.
+
 `categorize` and `link_loans` only fill in what's missing. It skips transactions that already have one
 (including ones the user set by hand) and pending ones (the sync replaces those every day).
 It refuses unknown categories and categories that have sub-categories.
 
 ## Workflow
 
+0. **Start from the categorizer.** `transactions:unsure` lists what the nightly run could
+   not decide, with its guess. Work through those first with the steps below; for a large
+   backlog when the categorizer is off, fall back to `transactions:uncategorized`.
 1. **Load the context** and read every category description. The descriptions are the rules.
    The "known counterparties" list shows earlier decisions; follow them unless they clearly
    contradict a description.
@@ -70,44 +113,17 @@ It refuses unknown categories and categories that have sub-categories.
    question for each group. Ask about groups (e.g. "the 9 payments from the same counterparty"), not
    single rows.
 
-## Signals, strongest first
+## Signals and rules
 
-1. **Category descriptions and earlier decisions** for the same counterparty on the same account.
-2. **The account.** Some accounts have one purpose (e.g. a rental property's account), so the
-   same counterparty can belong to different categories depending on the account.
-3. **Reference number.** Recurring payments to the same payee (maintenance fees for different
-   apartments, card invoices) are told apart by their reference.
-4. **Counterparty name**, including card-payment prefixes (`PTL*`, `SQ*`, `Zettle_*`,
-   `Paytrail Oyj <merchant>`, `UBER *TRIP`, `MCD…` = McDonald's).
-5. **Merchant category code** (card purchases).
-6. **Bank code** (`raw.bank_transaction_code.description`): `Suoritus` = payment received on the
-   credit card, `Tilisiirto` = transfer, `Otto` = withdrawal, `Laina Nordea` = loan paid out,
-   `Koron pääomitus` = interest credited.
-7. **Description** (remittance information).
+The signals (strongest first) and the rules that are easy to get wrong are kept in one place,
+shared with the nightly categorizer: `app/services/bank_transactions/categorizer/prompt.md`.
+Read it before deciding anything, and follow it the same way the categorizer does. Change it
+there, never here, so the two never drift apart; then run `transactions:categorizer_eval`.
 
-## Rules that are easy to get wrong
-
-- **Own transfers and credit card payments** are found in pairs: an outgoing payment on one of
-  the owner's accounts and an incoming one of the same amount on another (for the card: a payment to the
-  card issuer with the card's reference, and a `Suoritus` of the same amount on the card account,
-  usually within a few days). Categorize both sides as Own, for the whole amount. Interest and
-  fees on the card are not part of the payment: they come as separate rows on the card account
-  and go to Loans, with no loan to link (the card is a `CreditCard` account in the app, not a
-  loan). A payment with no matching other side is not proven to be Own; treat it as unsure
-  unless the description says otherwise. The other side is often still pending; `bank:sync`
-  fetches it once the bank has booked it.
-- **Transfers between the owner's accounts at the same bank** (bank code `Oma siirto`) are Own.
-  Deposits from the owner's accounts at other banks (bank code `Pano`) are not automatically
-  Own: follow the Own and Salary descriptions. Transfers with other people, family included,
-  are never Own.
-- **Refunds** go to the category of the original purchase (a positive amount), not to income.
-- **Sub-categories only.** Never assign a category that has sub-categories. Anything spent on
-  or received for a specific investment goes to that investment's sub-category, even if it would
-  otherwise look like Household, Loans or Hardware store.
-- **Large amounts** (over 1 000 € either way) must match a description or an earlier decision
-  exactly. Otherwise ask.
-- **Never re-categorize.** If an existing category looks wrong, report it to the user instead
-  of changing it.
+**Never re-categorize on your own.** If an existing category looks wrong, report it to the user
+instead of changing it. When the user decides a move, `transactions:recategorize ASSIGN=...`
+(same pairs as `categorize`, `DRY_RUN=1` first) moves transactions whatever their category and
+drops a loan link.
 
 ## When you learn something
 
@@ -120,5 +136,8 @@ bin/kamal app exec --reuse 'bin/rails categories:list'                       # c
 bin/kamal app exec --reuse 'bin/rails categories:upsert NAME="Loans" DESCRIPTION="…"'
 ```
 
-The descriptions in the database are the shared source of truth, also for automated
-categorization later. `db/seeds.rb` only holds generic defaults and never overwrites them.
+The descriptions in the database are the shared source of truth, also for the nightly
+categorizer. A changed description makes the categorizer reconsider the transactions it was
+unsure about on its next run. Each user's descriptions are their own: a rule learned for one
+user goes into that user's category (`EMAIL=...`), not the owner's. `db/seeds.rb` only holds
+generic defaults and never overwrites them.

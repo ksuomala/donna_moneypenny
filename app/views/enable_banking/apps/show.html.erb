@@ -1,0 +1,41 @@
+<% content_for :title, "Enable Banking · Donna Moneypenny" %>
+
+<main class="page">
+  <nav class="page-nav"><%= link_to "Bank connections", root_path %></nav>
+
+  <h1>Your Enable Banking application</h1>
+
+  <p>
+    The bank login goes through your own application in the
+    <%= link_to "Enable Banking Control Panel", "https://enablebanking.com/cp/applications", target: "_blank", rel: "noopener" %>.
+    In restricted mode it can read only the accounts you link to it, and no contract with Enable Banking is needed.
+  </p>
+
+  <ol>
+    <li>Register a production application, with this as its redirect URL:<br>
+      <code class="callback-url"><%= enable_banking_callback_url_for(@app) %></code></li>
+    <li>Use <%= link_to "Privacy", privacy_url %> and <%= link_to "Terms", terms_url %> as the application's privacy policy and terms.</li>
+    <li>Activate the application in restricted mode by linking your own accounts.</li>
+    <li>Enter the application ID and the private key (the <code>.pem</code> file) below.</li>
+  </ol>
+
+  <%= form_with model: @app, url: enable_banking_app_path, method: :patch, class: "settings-form" do |form| %>
+    <% if @app.errors.any? %>
+      <div class="flash flash-alert">
+        <% @app.errors.full_messages.each do |message| %><p><%= message %></p><% end %>
+      </div>
+    <% end %>
+
+    <%= form.label :application_id, "Application ID" %>
+    <%= form.text_field :application_id, required: true, autocomplete: "off", spellcheck: false %>
+
+    <%= form.label :private_key_file, "Private key (.pem file)" %>
+    <%= form.file_field :private_key_file, accept: ".pem,application/x-pem-file" %>
+
+    <%= form.label :private_key, "or paste it" %>
+    <%= form.text_area :private_key, value: nil, rows: 8, spellcheck: false, autocomplete: "off", wrap: "off",
+          placeholder: @app.private_key? ? "Stored. Choose or paste a new key to replace it." : "-----BEGIN PRIVATE KEY-----" %>
+
+    <%= form.submit "Save", class: "button" %>
+  <% end %>
+</main>

@@ -1,0 +1,16 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "Redirect",
+      "warning_code": 18,
+      "fingerprint": "5c79ba60323c6a86c48a105314dcf65dce0f813bc6760d572f2f48cea44f4971",
+      "check_name": "Redirect",
+      "message": "Possible unprotected redirect",
+      "file": "app/controllers/enable_banking/authorizations_controller.rb",
+      "line": 29,
+      "note": "The URL comes from Enable Banking's authorization response, not from the request."
+    }
+  ],
+  "updated": "2026-10-26 00:00:00 +0000",
+  "brakeman_version": "7.1.1"
+}

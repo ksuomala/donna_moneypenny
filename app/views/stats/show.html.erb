@@ -1,7 +1,7 @@
 <% content_for :title, "Stats · Donna Moneypenny" %>
 
 <main class="page stats">
-  <nav class="page-nav"><%= link_to "Bank connections", root_path %></nav>
+  <nav class="page-nav"><%= link_to "Bank connections", root_path %><%= button_to "Sign out", session_path, method: :delete, class: "link-button", form_class: "button-to" %></nav>
 
   <h1>Stats</h1>
   <p class="muted stats-period"><%= stats_period_label(@range) %></p>
@@ -14,9 +14,29 @@
   </nav>
 
   <div class="stats-filters">
-    <div class="quick-filters">
+    <div class="quick-filters period-filters">
       <% { "week" => "This week", "month" => "This month", "year" => "This year" }.each do |period, label| %>
         <%= link_to label, stats_path(period: period), class: [ "chip", { "chip-active": @period == period } ], aria: { current: (@period == period ? "true" : nil) } %>
+      <% end %>
+    </div>
+
+    <% if @members.many? %>
+      <div class="quick-filters scope-filter" aria-label="Whose">
+        <% { "me" => "Me", "household" => Current.user.household.name }.each do |scope, label| %>
+          <%= link_to label, stats_path(request.query_parameters.merge(scope: scope)), class: [ "chip", { "chip-active": @scope == scope } ], aria: { current: (@scope == scope ? "true" : nil) } %>
+        <% end %>
+        <% if @scope == "household" && @stats.internal_transfers.positive? %>
+          <span class="muted rate-note">between members, left out: <%= money(@stats.internal_transfers) %></span>
+        <% end %>
+      </div>
+    <% end %>
+
+    <div class="quick-filters currency-filter" aria-label="Currency">
+      <% DisplayCurrency::CODES.each do |code| %>
+        <%= link_to code, stats_path(request.query_parameters.merge(currency: code)), class: [ "chip", { "chip-active": @currency.code == code } ], aria: { current: (@currency.code == code ? "true" : nil) } %>
+      <% end %>
+      <% unless @currency.euros? %>
+        <span class="muted rate-note">1 € = <%= number_with_precision(@currency.rate, precision: 4, separator: ",") %> <%= @currency.unit %> (ECB, <%= l @currency.on, format: :long %>)</span>
       <% end %>
     </div>
 
@@ -30,17 +50,19 @@
   <div class="stat-tiles">
     <div class="stat-tile">
       <span class="muted">Income</span>
-      <strong><%= euros(@stats.income_total) %></strong>
+      <strong><%= money(@stats.income_total) %></strong>
     </div>
     <div class="stat-tile">
       <span class="muted">Expenses</span>
-      <strong><%= euros(@stats.expense_total) %></strong>
+      <strong><%= money(@stats.expense_total) %></strong>
     </div>
     <div class="stat-tile">
       <span class="muted">Net</span>
-      <strong><%= euros(@stats.net) %></strong>
+      <strong><%= money(@stats.net) %></strong>
     </div>
   </div>
+
+  <%= render "budget", report: @budget_report, budget: @budget, form_budget: @budget_form, categories: @budget_categories %>
 
   <div data-controller="tabs" data-tabs-storage-key-value="stats-chart">
     <div class="tabs" role="tablist">

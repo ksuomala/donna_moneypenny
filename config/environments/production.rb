@@ -57,9 +57,9 @@ Rails.application.configure do
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
   # config.action_mailer.raise_delivery_errors = false
 
-  # Must exactly match a redirect URL whitelisted for the Enable Banking application
-  # (the bare domain, even when the app is visited through www).
-  config.x.enable_banking.redirect_url = "https://donamoneypenny.app/enable_banking/sessions"
+  # Host of the Enable Banking callback URLs, which must exactly match the redirect URL
+  # whitelisted for each application (the bare domain, even when the app is visited through www).
+  config.x.enable_banking.callback_host = "donamoneypenny.app"
 
   # Set host to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: "donamoneypenny.app" }

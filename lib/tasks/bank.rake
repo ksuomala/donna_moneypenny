@@ -1,7 +1,19 @@
 namespace :bank do
-  desc "Fetch new transactions and today's balances for every account, like the daily job"
+  desc "Fetch new transactions and today's balances for every account, like the daily job; ACCOUNT=5 for one account only"
   task sync: :environment do
-    SyncBankTransactionsJob.perform_now
+    SyncBankTransactionsJob.perform_now(account_id: ENV["ACCOUNT"].presence&.to_i)
+  end
+
+  desc "Attach the accounts of every active connection again from its stored session (CONNECTION=3 for one), " \
+       "adding the ones an older matching rule lost; existing accounts are kept"
+  task attach_accounts: :environment do
+    scope = ENV["CONNECTION"].present? ? BankConnection.where(id: ENV["CONNECTION"]) : BankConnection.active
+    scope.find_each do |connection|
+      before = connection.bank_accounts.count
+      connection.reattach_accounts!
+      puts "#{connection.aspsp_name} (#{connection.id}): #{connection.bank_accounts.count - before} account(s) added, " \
+           "#{connection.bank_accounts.count} on the connection"
+    end
   end
 end
 
@@ -21,7 +33,7 @@ namespace :accounts do
     puts "# id, date, amount, counterparty, description, bank code, category, balance after"
     rows.each do |t|
       running += t.amount if running
-      puts [ t.id, t.occurred_on, t.amount.to_s("F"), t.counterparty_name, t.description, t.raw&.dig("bank_transaction_code", "description"),
+      puts [ t.id, t.occurred_on, t.amount.to_s("F"), t.counterparty_name, t.description, t.bank_code,
              names[t.transaction_category_id], running&.to_s("F") ].map { |v| v.to_s.squish }.join("\t")
     end
   end
@@ -36,11 +48,11 @@ namespace :accounts do
                account.balance_on(on)&.to_s("F") || "unknown" ].join("\t")
       end
     else
-      puts "# id, name, kind, snapshot date, booked, available, credit limit"
+      puts "# id, name, kind, snapshot date, booked, booked type, available, available type, credit limit"
       BankAccount.order(:id).each do |account|
         latest = account.balances.order(:on).last
         puts [ account.id, account.display_name, account.credit_card? ? "credit card" : "account",
-               latest&.on, latest&.booked&.to_s("F") || "unknown", latest&.available&.to_s("F"),
+               latest&.on, latest&.booked&.to_s("F") || "unknown", latest&.booked_type, latest&.available&.to_s("F"), latest&.available_type,
                (account.credit_limit&.to_s("F") if account.credit_card?) ].join("\t")
       end
     end

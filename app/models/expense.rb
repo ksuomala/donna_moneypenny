@@ -1,4 +1,6 @@
 class Expense < ApplicationRecord
+  include OwnedByUser
+
   enum :category, {
     housing: 0,
     transportation: 1,

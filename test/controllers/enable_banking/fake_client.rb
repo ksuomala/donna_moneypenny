@@ -2,15 +2,18 @@ module EnableBanking
   # Records calls and returns canned Enable Banking responses.
   class FakeClient
     attr_reader :calls
+    attr_accessor :app
 
-    def initialize(session_data: nil, error: nil)
+    def initialize(session_data: nil, error: nil, aspsps_error: nil)
       @session_data = session_data
       @error = error
+      @aspsps_error = aspsps_error
       @calls = []
     end
 
     def aspsps(country:)
       @calls << [ :aspsps, country ]
+      raise @aspsps_error if @aspsps_error
       [ { "name" => "Nordea", "country" => "FI", "maximum_consent_validity" => 15_552_000 } ]
     end
 

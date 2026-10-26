@@ -1,7 +1,11 @@
 # One Enable Banking session: the consent given at a bank, valid until valid_until.
 # Reconnecting (e.g. after the consent expires) creates a new connection; accounts are
-# matched by IBAN so they carry over to the newest connection.
+# matched by IBAN so they carry over to the user's newest connection.
 class BankConnection < ApplicationRecord
+  include OwnedByUser
+
+  # The app whose key signs every request on this connection's session and accounts.
+  belongs_to :enable_banking_app, optional: true
   has_many :bank_accounts, dependent: :restrict_with_error
 
   enum :status, { active: 0, expired: 1, revoked: 2 }
@@ -24,6 +28,12 @@ class BankConnection < ApplicationRecord
     end
   end
 
+  # Attaches the accounts listed in the stored session again (bin/rails bank:attach_accounts),
+  # for accounts an older matching rule lost. Existing accounts are matched, not duplicated.
+  def reattach_accounts!
+    transaction { Array(raw["accounts"]).each { |account| attach_account!(account) } }
+  end
+
   def attach_account!(account)
     # Older API versions list accounts as bare uid strings.
     account = { "uid" => account } if account.is_a?(String)
@@ -31,9 +41,12 @@ class BankConnection < ApplicationRecord
     identification_hash = account["identification_hash"]
 
     # identification_hash is Enable Banking's stable account identity across sessions;
-    # IBAN is the fallback (cards have no IBAN, so they rely on the hash).
-    record = (identification_hash && BankAccount.find_by(identification_hash: identification_hash)) ||
-      (iban && BankAccount.find_by(iban: iban)) ||
+    # IBAN plus currency is the fallback (cards have no IBAN, so they rely on the hash; Revolut's
+    # currency pockets share one IBAN and differ only by currency).
+    # Only this user's accounts carry over: another user's login to the same account gets its own.
+    own = BankAccount.owned_by(user_id)
+    record = (identification_hash && own.find_by(identification_hash: identification_hash)) ||
+      (iban && own.find_by(iban: iban, currency: account["currency"])) ||
       BankAccount.new
     record.update!(
       bank_connection: self,

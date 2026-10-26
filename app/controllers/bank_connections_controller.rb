@@ -1,5 +1,5 @@
 class BankConnectionsController < ApplicationController
   def index
-    @connections = BankConnection.includes(bank_accounts: :bank_transactions).order(created_at: :desc)
+    @connections = Current.user.bank_connections.includes(bank_accounts: :bank_transactions).order(created_at: :desc)
   end
 end

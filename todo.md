@@ -3,6 +3,33 @@
 Goal: read Nordea transactions through Enable Banking and store them in the database.
 Server and infrastructure tasks live in the devops repo (`~/code_ksuomala/devops`, `docs/open-issues.md`).
 
+## Next: multiple users, each with their own Enable Banking app
+
+Each user registers their own Enable Banking application in the Control Panel and activates it in restricted
+mode by linking their own accounts. That app can reach only those linked accounts, and nobody needs a contract
+with Enable Banking. Restrictions and redirect URLs are set per application.
+
+- [x] Each app has its own callback path (`/enable_banking/sessions/<token>`), shown on the settings page, so apps never share a redirect URL
+- [ ] Decide: fully separate data per user, or households sharing categories, rules and stats
+- [ ] Decide: accounts created by the owner only (rake task / console), or open sign-up
+- [x] `User` model with login (`bin/rails generate authentication`), replacing HTTP basic auth; users created with `users:create`, no sign-up
+- [x] Each user's Enable Banking app ID and private key stored encrypted in the database (`EnableBankingApp`, Active Record
+      encryption), with a settings page (`/enable_banking/app`) that checks them with a signed request before saving
+- [x] Each connection remembers its app (`bank_connections.enable_banking_app_id`); `EnableBanking::Client.for(app)` everywhere
+- [x] `user_id` on the user's data (bank connections, categories, rules, loans, categorizer runs, expenses, incomes;
+      accounts and transactions through their connection); pages limited to the signed-in user
+- [ ] Production: deploy, then `bin/kamal app exec -i 'bin/rails users:create EMAIL=...'` to create the owner and claim the existing data
+- [ ] Then a migration making `user_id` NOT NULL (and `belongs_to :user` required); `db/seeds.rb` needs a user to own the defaults by then
+- [ ] Remove `basic_auth:` from the encrypted credentials
+- [ ] Rake tasks, the categorizer and the rules limited to one user (`USER=` / per-user jobs); until then they fall back to `User.owner`
+- [x] Callback signs the `POST /sessions` code exchange with the signed-in user's own app key, and refuses another app's callback
+- [x] Daily sync reads each connection with the app it was made with
+- [ ] Categorizer runs per user
+- [x] Assign existing data to the first user (`users:create` claims every row without an owner)
+- [ ] Production: after `users:create`, `bin/kamal app exec 'bin/rails enable_banking:claim_credentials'` moves the app from the
+      credentials to the owner and links the existing connections; add the printed redirect URL to the app in the Control Panel
+- [ ] Then remove `enable_banking:` from the encrypted credentials
+
 ## Enable Banking: setup (done)
 
 - [x] Enable Banking client that signs RS256 JWTs (`app/services/enable_banking/client.rb`)
@@ -47,7 +74,10 @@ stays the same once they're booked.
 
 - [x] `TransactionCategory` with kind (expense / income / transfer / investment), description and one level of
       sub-categories; transactions go on leaf categories only. Generic defaults in `db/seeds.rb`, own categories via `categories:import`
-- [ ] Categorize transactions automatically (Claude), using the category descriptions as instructions
+- [x] Categorize transactions automatically (Claude), using the category descriptions as instructions
+      (`CategorizeTransactionsJob` after the sync, shadow mode by default, `transactions:categorizer_eval`)
+- [x] Compare models on the same sample (`categorizer_eval MODEL= SEED=`): GPT-6 Luna as the default, apply mode on
+- [x] Reference and amount rules before the model (`CategorizationRule`, derived from history, retired on conflict)
 
 ## Stats
 
@@ -64,7 +94,6 @@ stays the same once they're booked.
 ## Later
 
 - [ ] Map bank transactions to `Expense` / `Income` categories (rules by counterparty or message)
-- [ ] Replace basic auth with proper login (`bin/rails generate authentication`) if more than one device or user needs it
 - [ ] Add a contact email to `/privacy` and `/terms`
 
 ## Credit cards and balances (issue #5)

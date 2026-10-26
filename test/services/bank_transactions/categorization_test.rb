@@ -116,4 +116,92 @@ class BankTransactions::CategorizationTest < ActiveSupport::TestCase
     assert_includes context, "#{@account.id}\tKäyttötili\taccount"
     assert_includes context, "#{card.id}\tCredit Card\tcredit card"
   end
+
+  test "known decisions and context can leave out given transactions" do
+    kept = transaction("a", transaction_category: @groceries)
+    hidden = transaction("b", transaction_category: @apartment)
+
+    assert_equal [ [ "K-Market", @account.id, @groceries.id, 1 ], [ "K-Market", @account.id, @apartment.id, 1 ] ],
+                 BankTransactions::Categorization.known_decisions.sort_by(&:last)
+    assert_equal [ [ "K-Market", @account.id, @groceries.id, 1 ] ], BankTransactions::Categorization.known_decisions(excluding: [ hidden.id ])
+    assert_not_includes BankTransactions::Categorization.context(excluding: [ hidden.id ]), "Apartment A\t1"
+    assert_includes BankTransactions::Categorization.context(excluding: [ hidden.id ]), "Groceries\t1"
+    assert_equal "#{kept.id}\t#{@account.id}\t2026-10-01\t-12.5\tEUR\tK-Market\t\t\t\t", BankTransactions::Categorization.transaction_row(kept)
+  end
+
+  test "pairing hints are the same amount the other way round on another account within five days, pending included" do
+    rental = @account.bank_connection.bank_accounts.create!(uid: "acc-2", name: "Vuokratili", currency: "EUR")
+    build = ->(account, ref, amount, date, status: "booked") do
+      account.bank_transactions.create!(entry_reference: ref, status: status, occurred_on: date, amount: amount, currency: "EUR", counterparty_name: "Me")
+    end
+    out = build.(@account, "out", -300, Date.new(2026, 10, 10))
+    pending_side = build.(rental, "p", 300, Date.new(2026, 10, 12), status: "pending")
+    booked_side = build.(rental, "b", 300, Date.new(2026, 10, 5))
+    build.(rental, "late", 300, Date.new(2026, 10, 16))
+    build.(rental, "wrong", -300, Date.new(2026, 10, 10))
+    build.(@account, "same", 300, Date.new(2026, 10, 10))
+    lone = build.(@account, "lone", -42, Date.new(2026, 10, 10))
+
+    hints = BankTransactions::Categorization.pairing_hints([ out, lone ])
+
+    assert_equal [ booked_side, pending_side ], hints[out.id]
+    assert_equal [], hints[lone.id]
+  end
+
+  test "listings and writes are one user's: another user's categories and transactions stay out" do
+    other_user = User.where.not(id: User.owner.id).first
+    theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
+    their_account = theirs.bank_accounts.create!(uid: "acc-2", currency: "EUR")
+    their_rent = TransactionCategory.create!(name: "Rent", kind: :expense, user: other_user)
+    their_transaction = their_account.bank_transactions.create!(entry_reference: "t", status: "booked", occurred_on: Date.new(2026, 10, 1),
+                                                                amount: -800, currency: "EUR", counterparty_name: "Landlord", transaction_category: their_rent)
+    mine = transaction("a")
+
+    context = BankTransactions::Categorization.context(user: User.owner)
+    assert_not_includes context, "Rent"
+    assert_not_includes context, "Landlord"
+    assert_no_match(/^#{their_transaction.id}\t/, BankTransactions::Categorization.uncategorized(user: User.owner))
+
+    assert_raises(ArgumentError) { BankTransactions::Categorization.apply({ mine.id => their_rent.id }, user: User.owner) }
+    result = BankTransactions::Categorization.apply({ their_transaction.id => @groceries.id, mine.id => @groceries.id }, user: User.owner)
+    assert_equal [ their_transaction.id ], result.skipped
+    assert_equal @groceries, mine.reload.transaction_category
+
+    their_context = BankTransactions::Categorization.context(user: other_user)
+    assert_includes their_context, "Landlord\t#{their_account.id}\tRent\t1"
+    assert_not_includes their_context, "Groceries"
+  end
+
+  test "reassign moves categorized transactions and drops their loan link" do
+    loans = TransactionCategory.create!(name: "Loans", exclude_from_stats: true)
+    loan = Loan.create!(name: "Loan from a friend", creditor: "Friend")
+    rent = TransactionCategory.create!(name: "Rent received", kind: :income)
+    moved = transaction("a", transaction_category: loans, loan: loan)
+    same = transaction("b", transaction_category: rent)
+    pending = transaction("c", status: "pending", transaction_category: loans)
+
+    preview = BankTransactions::Categorization.reassign({ moved.id => rent.id, same.id => rent.id, pending.id => rent.id, 999_999 => rent.id }, dry_run: true)
+    assert_equal({ moved.id => rent.id }, preview.applied)
+    assert_equal [ same.id, pending.id, 999_999 ], preview.skipped
+    assert_equal loans, moved.reload.transaction_category
+
+    BankTransactions::Categorization.reassign({ moved.id => rent.id })
+    assert_equal rent, moved.reload.transaction_category
+    assert_nil moved.loan
+    assert_raises(ArgumentError) { BankTransactions::Categorization.reassign({ moved.id => @investment.id }) }
+  end
+
+  test "clear! takes the categories, rules and loans off one user's transactions only" do
+    other_user = User.where.not(id: User.owner.id).first
+    theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Revolut", aspsp_country: "LT", valid_until: 1.month.from_now)
+    their_transaction = theirs.bank_accounts.create!(uid: "acc-2", currency: "EUR").bank_transactions.create!(
+      entry_reference: "t", status: "booked", occurred_on: Date.new(2026, 10, 1), amount: -800, currency: "EUR", transaction_category: @groceries)
+    mine = transaction("a", transaction_category: @groceries)
+
+    assert_equal 1, BankTransactions::Categorization.clear!(other_user, dry_run: true)
+    assert_equal @groceries, their_transaction.reload.transaction_category
+    assert_equal 1, BankTransactions::Categorization.clear!(other_user)
+    assert_nil their_transaction.reload.transaction_category
+    assert_equal @groceries, mine.reload.transaction_category
+  end
 end

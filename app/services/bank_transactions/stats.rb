@@ -1,5 +1,9 @@
 module BankTransactions
-  # Totals per category for a date range, split into incomes and expenses.
+  # A user's totals per category for a date range, split into incomes and expenses. With
+  # several users (a household) the totals are combined: categories with the same name and
+  # kind merge into one slice, and money that moved between the members (any transaction
+  # whose counterparty is another member, by the names in HouseholdAlias, e.g. rent paid to
+  # each other) is left out whatever its category on either side.
   #
   # Expense and income categories show their totals as positive amounts (refunds reduce an
   # expense). Each investment sub-category is netted into one figure: rent 1000 minus vastike 280
@@ -27,11 +31,16 @@ module BankTransactions
     # during it (nil when we don't know).
     AccountRow = Data.define(:name, :balance, :change)
 
-    attr_reader :range
+    attr_reader :range, :users
 
-    def initialize(range)
+    def initialize(range, user: nil, users: nil)
       @range = range
+      @users = Array(users.presence || user)
+      raise ArgumentError, "Stats need at least one user" if @users.empty?
     end
+
+    def user = users.first
+    def household? = users.many?
 
     # Slices are signed, so money in is income and money out an expense whatever the kind.
     def incomes
@@ -59,7 +68,7 @@ module BankTransactions
     # Current and savings accounts with the balance the bank last reported on or before the
     # end of the range.
     def accounts
-      @accounts ||= BankAccount.deposit.order(:id).map do |account|
+      @accounts ||= BankAccount.owned_by(users).deposit.order(:id).map do |account|
         balance = account.balance_on(range.end)
         before = account.balance_on(range.begin - 1)
         AccountRow.new(name: account.display_name, balance:, change: (balance - before if balance && before))
@@ -68,10 +77,33 @@ module BankTransactions
 
     def account_total = accounts.filter_map(&:balance).sum(BigDecimal(0))
 
+    # What moved between the members in the range and is left out: money out as a positive amount.
+    def internal_transfers
+      @internal_transfers ||= household? ? -all.where(id: internal_transfer_ids).where(amount: ...0).sum(:amount) : BigDecimal(0)
+    end
+
     private
 
+    def all
+      BankTransaction.booked.where(occurred_on: range).where(bank_account_id: BankAccount.owned_by(users).select(:id))
+    end
+
     def scope
-      BankTransaction.booked.where(occurred_on: range)
+      household? ? all.where.not(id: internal_transfer_ids) : all
+    end
+
+    # Transactions with another member of the household on the other side, by that member's
+    # aliases in the counterparty or the description (a MobilePay payment names the payment
+    # service as the counterparty and the person in the description): payments between
+    # members, whichever side and whatever the category.
+    def internal_transfer_ids
+      @internal_transfer_ids ||= users.flat_map do |member|
+        others = HouseholdAlias.where(user: users - [ member ]).pluck(:name)
+        next [] if others.empty?
+
+        all.where(bank_account_id: member.bank_accounts.select(:id)).pluck(:id, :counterparty_name, :description)
+          .filter_map { |id, counterparty, description| id if HouseholdAlias.match?(counterparty, others) || HouseholdAlias.match?(description, others) }
+      end
     end
 
     def slices
@@ -86,13 +118,18 @@ module BankTransactions
         .group(:transaction_category_id).sum(:amount)
       categories = TransactionCategory.where(id: sums.keys).index_by(&:id)
 
-      sums.filter_map do |category_id, amount|
+      # Members' categories with the same name and kind are one slice.
+      merged = sums.each_with_object(Hash.new(BigDecimal(0))) do |(category_id, amount), totals|
         category = categories[category_id]
-        next if amount.zero?
-        next if category.expense? && amount.positive?
-        next if category.income? && amount.negative?
+        totals[[ category.name, category.kind ]] += amount
+      end
 
-        Slice.new(name: category.name, amount:, kind: category.kind)
+      merged.filter_map do |(name, kind), amount|
+        next if amount.zero?
+        next if kind == "expense" && amount.positive?
+        next if kind == "income" && amount.negative?
+
+        Slice.new(name:, amount:, kind:)
       end
     end
 
@@ -105,8 +142,12 @@ module BankTransactions
       end
     end
 
+    # In a household, a loan from one member to another (the creditor is another member, by
+    # their aliases) is money inside the household and is left out.
     def loan_rows
-      Loan.order(:name).filter_map do |loan|
+      Loan.where(user: users).order(:name).filter_map do |loan|
+        next if household? && HouseholdAlias.match?(loan.creditor, HouseholdAlias.where(user: users - [ loan.user ]).pluck(:name))
+
         balance = loan.balance_on(range.end)
         before = loan.balance_on(range.begin - 1)
         moved = loan.bank_transactions.booked.where(occurred_on: range)
@@ -122,7 +163,7 @@ module BankTransactions
     # purchases are already in the expenses and payments onto it are Own, so it has no taken
     # and paid. A card with nothing owed and nothing moving in the range is left out.
     def credit_card_rows
-      CreditCard.order(:id).filter_map do |card|
+      BankAccount.owned_by(users).where(type: CreditCard.sti_name).order(:id).filter_map do |card|
         balance = card.owed_on(range.end)
         before = card.owed_on(range.begin - 1)
         next if balance&.zero? && card.bank_transactions.booked.where(occurred_on: range).none?

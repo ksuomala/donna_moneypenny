@@ -23,17 +23,14 @@ class SyncBankTransactionsJobTest < ActiveJob::TestCase
   end
 
   setup do
-    @connection = BankConnection.create!(session_id: "s", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now)
+    @app = create_enable_banking_app(users(:one))
+    @connection = BankConnection.create!(session_id: "s", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now, enable_banking_app: @app)
     @first = @connection.bank_accounts.create!(uid: "acc-1")
     @second = @connection.bank_accounts.create!(uid: "acc-2")
   end
 
-  def with_client(client)
-    original = EnableBanking::Client.factory
-    EnableBanking::Client.factory = -> { client }
-    yield
-  ensure
-    EnableBanking::Client.factory = original
+  def with_client(client, &)
+    with_enable_banking_client(client, &)
   end
 
   test "syncs every account of active connections" do
@@ -42,6 +39,47 @@ class SyncBankTransactionsJobTest < ActiveJob::TestCase
     assert_equal 1, @first.bank_transactions.count
     assert_equal 1, @second.bank_transactions.count
     assert_equal [ 100, 100 ], [ @first, @second ].map(&:balance)
+  end
+
+  test "syncs one account only when asked" do
+    with_client(StubClient.new) { SyncBankTransactionsJob.perform_now(account_id: @second.id) }
+
+    assert_equal 0, @first.bank_transactions.count
+    assert_equal 1, @second.bank_transactions.count
+    assert_nil @first.last_synced_at
+  end
+
+  test "each connection is read with the app it was made with" do
+    theirs = create_enable_banking_app(users(:two))
+    other = BankConnection.create!(user: users(:two), session_id: "s2", aspsp_name: "Nordea", aspsp_country: "FI",
+      valid_until: 1.month.from_now, enable_banking_app: theirs)
+    other.bank_accounts.create!(uid: "acc-3")
+    apps = []
+    original = EnableBanking::Client.factory
+    EnableBanking::Client.factory = ->(app) { apps << app; StubClient.new }
+
+    SyncBankTransactionsJob.perform_now
+
+    assert_equal [ @app, @app, theirs ].sort_by(&:id), apps.sort_by(&:id)
+  ensure
+    EnableBanking::Client.factory = original
+  end
+
+  test "a connection without an app fails its accounts only" do
+    @connection.update!(enable_banking_app: nil)
+    other = BankConnection.create!(session_id: "s2", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now, enable_banking_app: @app)
+    third = other.bank_accounts.create!(uid: "acc-3")
+
+    original = EnableBanking::Client.factory
+    # The real factory for the connection without an app, which has no credentials to sign with.
+    EnableBanking::Client.factory = ->(app) { app ? StubClient.new : original.call(app) }
+
+    error = assert_raises(EnableBanking::Client::Error) { SyncBankTransactionsJob.perform_now }
+
+    assert_match "acc-1: Enable Banking credentials are not configured", error.message
+    assert_equal 1, third.bank_transactions.count
+  ensure
+    EnableBanking::Client.factory = original
   end
 
   test "one failing account doesn't stop the others, but the job still fails" do
@@ -63,6 +101,36 @@ class SyncBankTransactionsJobTest < ActiveJob::TestCase
 
     assert_match "db hiccup", error.message
     assert_equal 1, @second.bank_transactions.count
+  end
+
+  test "rules categorize after the sync, before the categorizer, each user's rules on their own transactions" do
+    own = TransactionCategory.create!(name: "Own", exclude_from_stats: true)
+    CategorizationRule.create!(reference: "ref-acc-1", transaction_category: own)
+    other_user = User.where.not(id: User.owner.id).first
+    theirs = BankConnection.create!(user: other_user, session_id: "s2", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now,
+                                    enable_banking_app: other_user.enable_banking_app || create_enable_banking_app(other_user))
+    third = theirs.bank_accounts.create!(uid: "acc-3")
+    their_own = TransactionCategory.create!(user: other_user, name: "Own", exclude_from_stats: true)
+    CategorizationRule.create!(reference: "ref-acc-3", transaction_category: their_own)
+    CategorizationRule.create!(reference: "ref-acc-2", transaction_category: their_own)
+    client = StubClient.new
+    client.define_singleton_method(:transactions) do |account_uid:, **params|
+      super(account_uid: account_uid, **params).tap { |page| page["transactions"].each { |t| t["reference_number"] = "ref-#{account_uid}" } }
+    end
+
+    with_client(client) { SyncBankTransactionsJob.perform_now }
+
+    assert_equal own, @first.bank_transactions.sole.transaction_category
+    assert_nil @second.bank_transactions.sole.transaction_category
+    assert_equal their_own, third.bank_transactions.sole.transaction_category
+  end
+
+  test "the categorizer follows the sync, also when an account failed" do
+    assert_enqueued_with(job: CategorizeTransactionsJob) do
+      assert_raises(EnableBanking::Client::Error) do
+        with_client(StubClient.new(failing_uids: [ "acc-1" ])) { SyncBankTransactionsJob.perform_now }
+      end
+    end
   end
 
   test "expired consent marks the connection expired without calling the bank" do

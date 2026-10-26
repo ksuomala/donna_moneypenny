@@ -5,7 +5,8 @@ module BankTransactions
   # Pending ones are replaced as a set on every sync: Nordea may give a transaction a new
   # entry_reference once it's booked, and cancelled card holds simply disappear.
   # Balances are kept as one snapshot per account per day; syncing again the same day
-  # replaces that day's snapshot.
+  # replaces that day's snapshot. Amounts in other currencies are converted to euros
+  # (BankTransactions::Conversion).
   class Sync
     # First sync goes as far back as the bank allows (current accounts returned ~5 months,
     # the credit card ~7 weeks when this was written).
@@ -17,20 +18,23 @@ module BankTransactions
     # The day a balance snapshot is filed under: the sync runs in the evening Helsinki time.
     TIME_ZONE = "Europe/Helsinki"
 
-    def initialize(bank_account, client: EnableBanking::Client.build)
+    # The client defaults to the app the account's connection was made with: the session is
+    # bound to that app, so only its key can read the account.
+    def initialize(bank_account, client: EnableBanking::Client.for(bank_account.bank_connection.enable_banking_app), conversion: Conversion.new)
       @account = bank_account
       @client = client
+      @conversion = conversion
     end
 
     # Returns the number of transactions that were new to us. Transactions are saved before
     # the balances are fetched, so a failed balances request loses nothing but the snapshot.
     def call
       transactions = fetch_all(date_from)
+      rows = @conversion.transactions(with_references(transactions).map { |t| BankTransaction.attributes_from_api(t).merge(bank_account_id: @account.id) })
       before = @account.bank_transactions.booked.count
 
       BankTransaction.transaction do
         @account.bank_transactions.pending.delete_all
-        rows = with_references(transactions).map { |t| BankTransaction.attributes_from_api(t).merge(bank_account_id: @account.id) }
         # MySQL upserts on the unique (bank_account_id, entry_reference) index.
         BankTransaction.upsert_all(rows, record_timestamps: true) if rows.any?
         @account.update!(last_synced_at: Time.current)
@@ -51,10 +55,13 @@ module BankTransactions
     # Today's snapshot. Nothing is recorded when the bank reports no booked balance, so the
     # account shows as unknown rather than zero.
     def record_balances
-      attributes = BankAccountBalance.attributes_from_api(@client.balances(account_uid: @account.uid))
+      balances = @client.balances(account_uid: @account.uid)
+      attributes = BankAccountBalance.attributes_from_api(balances)
       return unless attributes
 
-      @account.balances.find_or_initialize_by(on: Time.find_zone(TIME_ZONE).today).update!(attributes)
+      today = Time.find_zone(TIME_ZONE).today
+      currency = balances.first.dig("balance_amount", "currency") || @account.currency
+      @account.balances.find_or_initialize_by(on: today).update!(@conversion.balance(attributes, currency, today))
     end
 
     # Nordea occasionally omits entry_reference (seen on a pending row). Those get a stable

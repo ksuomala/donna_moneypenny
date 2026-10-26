@@ -1,0 +1,60 @@
+namespace :transactions do
+  desc "Run the categorizer over the acting user's uncategorized backlog now, in the background (shadow unless CATEGORIZER_APPLY). " \
+       "EMAIL=... for another user, ALL=1 for every user with categories (as after the sync). LIMIT=200. DRY_RUN=1 decides one batch inline and stores nothing"
+  task categorizer_run: :environment do
+    config = Rails.configuration.x.categorizer
+    abort "No API key for #{config.model}: see bin/rails credentials:edit" unless BankTransactions::Categorizer.configured?
+
+    if ENV["DRY_RUN"].present?
+      user = acting_user
+      batch = user.bank_transactions.booked.where(transaction_category_id: nil).order(:occurred_on, :id).limit(Integer(ENV.fetch("LIMIT", config.batch_size.to_s))).to_a
+      abort "Nothing to categorize for #{user.email_address}" if batch.empty?
+
+      result = BankTransactions::Categorizer.new(user: user).call(batch)
+      names = TransactionCategory.where(user: user).pluck(:id, :name).to_h
+      loans = Loan.where(user: user).pluck(:id, :name).to_h
+      puts "# dry run for #{user.email_address} with #{result.model}: #{result.verdicts.count(&:confident?)} confident, #{result.verdicts.count { |v| !v.confident? }} unsure, nothing stored"
+      puts "# id, date, amount, counterparty, description, confidence, category, loan, reason, guard"
+      batch.zip(result.verdicts).each do |t, v|
+        puts [ t.id, t.occurred_on, t.amount.to_s("F"), t.counterparty_name, t.description, v.confidence, names[v.category_id], loans[v.loan_id], v.reason, v.guard ]
+          .map { |value| value.to_s.squish }.join("\t")
+      end
+      puts "# tokens: #{result.usage.input_tokens} in, #{result.usage.output_tokens} out, #{result.usage.cache_read_input_tokens} read from cache"
+    elsif ENV["ALL"].present?
+      CategorizeTransactionsJob.perform_later(limit: ENV["LIMIT"]&.to_i)
+      puts "Enqueued a #{config.apply ? "apply" : "shadow"} run for each of #{User.categorizing.count} user(s); follow them with transactions:categorizer_runs"
+    else
+      CategorizeTransactionsJob.perform_later(user_id: acting_user.id, limit: ENV["LIMIT"]&.to_i)
+      puts "Enqueued a #{config.apply ? "apply" : "shadow"} run for #{acting_user.email_address}; follow it with transactions:categorizer_runs"
+    end
+  end
+
+  desc "Print the unsure decisions of the acting user's latest run (or RUN=id), grouped by counterparty, for the categorize-transactions skill (read-only). EMAIL=... for another user"
+  task unsure: :environment do
+    run = ENV["RUN"].present? ? CategorizationRun.find(ENV["RUN"]) : acting_user.categorization_runs.where.not(mode: :eval).latest_first.first
+    abort "No categorizer runs for #{acting_user.email_address} yet" unless run
+
+    puts run.unsure_lines
+  end
+
+  desc "Print every user's categorizer runs with their counts, token usage and estimated cost (read-only). LIMIT=20"
+  task categorizer_runs: :environment do
+    puts CategorizationRun.summary_lines(limit: Integer(ENV.fetch("LIMIT", "20")))
+  end
+end
+
+namespace :transactions do
+  desc "Test the categorizer on the acting user's already categorized transactions sent as new; writes nothing to them. " \
+       "EMAIL=... for another user. SAMPLE=200 SINCE=2026-01-01 MODEL=gpt-6-luna|jev-latest|claude-… SEED=1 (same SEED, same sample)"
+  task categorizer_eval: :environment do
+    model = ENV["MODEL"].presence || Rails.configuration.x.categorizer.model
+    unless BankTransactions::Categorizer.configured?(model)
+      abort "No API key for #{model}: add anthropic.api_key, openai.api_key or typesafe.api_key with bin/rails credentials:edit " \
+            "(or ANTHROPIC_API_KEY, OPENAI_API_KEY, TYPESAFE_API_KEY)"
+    end
+
+    since = ENV["SINCE"].present? ? Date.iso8601(ENV["SINCE"]) : nil
+    seed = ENV["SEED"].presence&.to_i
+    puts BankTransactions::CategorizerEval.new(sample: Integer(ENV.fetch("SAMPLE", "200")), since: since, model: model, seed: seed, user: acting_user).call.report
+  end
+end

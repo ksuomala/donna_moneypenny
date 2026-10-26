@@ -11,6 +11,7 @@
   --series-6: #008300;
   --series-7: #4a3aa7;
   --series-8: #e34948;
+  --series-9: #0e9aa7;
   --series-other: #9ca3af;
   --series-uncategorized: #4b5563;
 }
@@ -65,6 +66,15 @@
 .quick-filters {
   display: flex;
   gap: 0.5rem;
+}
+
+.currency-filter,
+.scope-filter {
+  align-items: center;
+}
+
+.rate-note {
+  font-size: 0.85rem;
 }
 
 .chip {
@@ -277,6 +287,7 @@
 .series-6 { fill: var(--series-6); background: var(--series-6); }
 .series-7 { fill: var(--series-7); background: var(--series-7); }
 .series-8 { fill: var(--series-8); background: var(--series-8); }
+.series-9 { fill: var(--series-9); background: var(--series-9); }
 .series-other { fill: var(--series-other); background: var(--series-other); }
 .series-uncategorized { fill: var(--series-uncategorized); background: var(--series-uncategorized); }
 
@@ -367,4 +378,82 @@
 
 .ledger-note {
   font-size: 0.85rem;
+}
+
+/* Budget */
+.budget-rows {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.budget-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.3rem 0.25rem;
+}
+
+.budget-row .bar {
+  background: var(--series-3);
+}
+
+.budget-row-over .bar {
+  background: var(--series-8);
+}
+
+.budget-row-total {
+  font-weight: 600;
+}
+
+.budget-form-details summary {
+  cursor: pointer;
+  color: #1d4ed8;
+}
+
+.budget-form {
+  margin-top: 0.75rem;
+}
+
+.budget-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.budget-lines {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.4rem 1rem;
+}
+
+.budget-line {
+  display: grid;
+  grid-template-columns: 1fr 7rem;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.budget-line input {
+  width: 100%;
+}
+
+.budget-actions {
+  font-size: 0.9rem;
+}
+
+.budget-actions .button-to {
+  display: inline;
+}
+
+@media (max-width: 40rem) {
+  .budget-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .budget-row .bar-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }

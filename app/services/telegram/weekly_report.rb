@@ -1,8 +1,8 @@
 module Telegram
   # A weekly report for a user or a household: last week's income, expenses and net with the
-  # largest expense categories, then this month so far against the budget in force, in the
-  # same scope as the stats page shows them (a household's combined, payments between the
-  # members left out).
+  # largest expense categories, then this month so far against the budget in force (lines
+  # nothing was spent on are left out), in the same scope as the stats page shows them (a
+  # household's combined, payments between the members left out).
   class WeeklyReport
     TOP_EXPENSES = 5
 
@@ -57,7 +57,7 @@ module Telegram
       report = BudgetReport.for(Budget.applying_to(owner, month), stats(month))
       return unless report
 
-      rows = [ report.total ].compact + report.rows
+      rows = [ report.total ].compact + report.rows.reject { |row| row.spent.zero? }
       ([ Format.bold("Budget, #{month.begin.strftime('%B')} so far") ] + rows.map { |row| "#{row.over? ? "⚠ " : ""}#{Format.budget_row(row)}" }).join("\n")
     end
   end

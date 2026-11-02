@@ -20,7 +20,8 @@ class Telegram::WeeklyReportTest < ActiveSupport::TestCase
     txn(-120.5, @groceries, Date.new(2026, 10, 22))
     txn(-400, @groceries, Date.new(2026, 10, 5))
     txn(-99, @groceries, Date.new(2026, 10, 26)) # this week: not in the week, in the month
-    @user.budgets.create!(starts_on: Date.new(2026, 10, 1), monthly_total: 1000, lines_attributes: { "Groceries" => 500 })
+    TransactionCategory.create!(user: @user, name: "Cafes", kind: :expense)
+    @user.budgets.create!(starts_on: Date.new(2026, 10, 1), monthly_total: 1000, lines_attributes: { "Groceries" => 500, "Cafes" => 50 })
 
     text = Telegram::WeeklyReport.new(@user, today: @today).text
 
@@ -31,6 +32,7 @@ class Telegram::WeeklyReportTest < ActiveSupport::TestCase
     assert_includes text, "<b>Budget, October so far</b>"
     assert_includes text, "Total: 619,50 € of 1 000,00 € · 380,50 € left"
     assert_includes text, "⚠ Groceries: 619,50 € of 500,00 € · 119,50 € over"
+    assert_not_includes text, "Cafes", "a budget line nothing was spent on is left out"
   end
 
   test "without a budget only the week is reported, and it is sent to the user's chat" do

@@ -457,3 +457,37 @@
     grid-row: 2;
   }
 }
+
+.bar-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.bar-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bar-details .bar-label::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--series-other);
+  transition: transform 0.15s;
+}
+
+.bar-details[open] .bar-label::before {
+  transform: rotate(90deg);
+}
+
+.bar-details .ledger-scroll {
+  margin: 0.25rem 0 1rem;
+}
+
+.ledger.transactions {
+  font-size: 0.8rem;
+}
+
+.ledger.transactions .description {
+  min-width: 12rem;
+  white-space: normal;
+}

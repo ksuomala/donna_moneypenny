@@ -72,6 +72,24 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     assert stats.expenses.first.uncategorized?
   end
 
+  test "a slice's transactions are listed largest first on its side, refunds and the other side last" do
+    txn(-30, @groceries)
+    txn(10, @groceries)
+    txn(-50, @groceries)
+    txn(-40, @groceries, status: "pending")
+    txn(1000, @flat)
+    txn(-280, @flat)
+    txn(-15, nil)
+    txn(100, nil)
+
+    groceries, = stats.expenses
+    assert_equal [ -50, -30, 10 ], stats.transactions(groceries, :expense).map(&:amount)
+    flat = stats.incomes.find { it.name == "Apartment A" }
+    assert_equal [ 1000, -280 ], stats.transactions(flat, :income).map(&:amount)
+    uncategorized = stats.expenses.find(&:uncategorized?)
+    assert_equal [ -15 ], stats.transactions(uncategorized, :expense).map(&:amount)
+  end
+
   test "loans show their balance at the end of the range, its change and the money that moved" do
     friend = Loan.create!(name: "Loan from a friend", creditor: "Friend", balance_from_transactions: true)
     friend.balances.create!(on: Date.new(2026, 3, 31), balance: 0)

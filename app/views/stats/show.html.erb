@@ -71,8 +71,8 @@
     </div>
 
     <div role="tabpanel" data-tabs-target="panel" data-tab="bar">
-      <%= render "bars", title: "Income", slices: @stats.incomes, total: @stats.income_total %>
-      <%= render "bars", title: "Expenses", slices: @stats.expenses, total: @stats.expense_total %>
+      <%= render "bars", title: "Income", stats: @stats, side: :income, slices: @stats.incomes, total: @stats.income_total %>
+      <%= render "bars", title: "Expenses", stats: @stats, side: :expense, slices: @stats.expenses, total: @stats.expense_total %>
     </div>
 
     <div role="tabpanel" data-tabs-target="panel" data-tab="pie" hidden>

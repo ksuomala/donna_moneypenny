@@ -7,10 +7,38 @@
     <% max = slices.first.amount %>
     <ul class="bars">
       <% slices.each do |slice| %>
-        <li class="<%= class_names("bar-row", "bar-row-uncategorized": slice.uncategorized?) %>" title="<%= slice.name %>: <%= money(slice.amount) %> (<%= share(slice.amount, total) %>)">
-          <span class="bar-label"><%= slice.name %><%= tag.span(" · net", class: "muted") if slice.investment? %></span>
-          <span class="bar-track"><span class="bar" style="width: <%= (slice.amount * 100 / max).round(1) %>%"></span></span>
-          <span class="bar-value"><%= money(slice.amount) %></span>
+        <li>
+          <details class="bar-details">
+            <summary class="<%= class_names("bar-row", "bar-row-uncategorized": slice.uncategorized?) %>" title="<%= slice.name %>: <%= money(slice.amount) %> (<%= share(slice.amount, total) %>)">
+              <span class="bar-label"><%= slice.name %><%= tag.span(" · net", class: "muted") if slice.investment? %></span>
+              <span class="bar-track"><span class="bar" style="width: <%= (slice.amount * 100 / max).round(1) %>%"></span></span>
+              <span class="bar-value"><%= money(slice.amount) %></span>
+            </summary>
+            <div class="ledger-scroll">
+              <table class="ledger transactions">
+                <thead>
+                  <tr>
+                    <th scope="col">Date</th>
+                    <th scope="col">Counterparty</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Account</th>
+                    <th scope="col" class="number">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% stats.transactions(slice, side).each do |transaction| %>
+                    <tr>
+                      <td><%= transaction.occurred_on.iso8601 %></td>
+                      <td><%= transaction.counterparty_name %></td>
+                      <td class="description"><%= transaction.description %></td>
+                      <td><%= transaction.bank_account.display_name %></td>
+                      <td class="number"><%= money(transaction.amount) %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </details>
         </li>
       <% end %>
     </ul>

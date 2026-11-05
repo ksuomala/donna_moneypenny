@@ -77,6 +77,18 @@ module BankTransactions
 
     def account_total = accounts.filter_map(&:balance).sum(BigDecimal(0))
 
+    # The transactions behind a slice of the incomes (side :income) or the expenses (:expense),
+    # largest first on that side; refunds and an investment's other side come last.
+    def transactions(slice, side)
+      rows =
+        if slice.uncategorized?
+          scope.where(transaction_category_id: nil).where(amount: side == :income ? 0.01.. : ...0)
+        else
+          scope.joins(:transaction_category).merge(TransactionCategory.in_stats.where(name: slice.name, kind: slice.kind))
+        end
+      rows.includes(:bank_account).order(amount: side == :income ? :desc : :asc, occurred_on: :asc)
+    end
+
     # What moved between the members in the range and is left out: money out as a positive amount.
     def internal_transfers
       @internal_transfers ||= household? ? -all.where(id: internal_transfer_ids).where(amount: ...0).sum(:amount) : BigDecimal(0)

@@ -48,6 +48,18 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     assert_select "svg.pie path.pie-slice", 1
   end
 
+  test "each category row expands into its transactions" do
+    txn(-12, @today).update!(counterparty_name: "K-Market")
+    txn(-30, @today)
+
+    get stats_path
+
+    assert_select "details.bar-details summary.bar-row", 1
+    assert_select "details.bar-details table.transactions tbody tr", 2
+    assert_select "table.transactions tbody tr:first-child td.number", "-30,00 €"
+    assert_select "table.transactions td", "K-Market"
+  end
+
   test "amounts can be shown in Danish kroner at today's ECB rate, remembered for the next page" do
     ExchangeRate.create!(currency: "DKK", on: Date.current, rate: "7.4600")
     txn(-10, @today)

@@ -133,6 +133,16 @@ class CategorizeTransactionsJobTest < ActiveJob::TestCase
     assert_match "down", run.error
   end
 
+  test "each user's finished run is followed by the reports and that user's uncategorized notice" do
+    transaction("a", counterparty: "Cafe")
+    user = User.categorizing.sole
+
+    CategorizerStub.with(stub) { perform_enqueued_jobs(only: CategorizeTransactionsJob) { CategorizeTransactionsJob.perform_later } }
+
+    assert_enqueued_with(job: ReportsJob)
+    assert_enqueued_with(job: UncategorizedNoticeJob, args: [ { user_id: user.id } ])
+  end
+
   test "does nothing without an API key" do
     transaction("a")
     backend = BankTransactions::Categorizer::AnthropicBackend

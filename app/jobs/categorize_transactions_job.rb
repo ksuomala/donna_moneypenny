@@ -6,7 +6,8 @@
 # into one job per user with categories. The first job of a run picks the user's transactions and
 # creates the CategorizationRun; every job decides one batch, stores the decisions, applies the
 # confident ones when the categorizer is in apply mode, and enqueues the next batch. Once a
-# user's run is through (or there is no categorizer), the budget alerts are checked.
+# user's run is through (or there is no categorizer), the budget alerts are checked and the
+# user is told about the transactions still without a category.
 class CategorizeTransactionsJob < ApplicationJob
   queue_as :default
   limits_concurrency to: 1, key: "categorizer"
@@ -19,7 +20,10 @@ class CategorizeTransactionsJob < ApplicationJob
   def perform(user_id: nil, run_id: nil, ids: nil, limit: nil, batch_size: nil)
     unless BankTransactions::Categorizer.configured?
       Rails.logger.info("[categorizer] no API key for #{config.model} (see bin/rails credentials:edit), skipping")
-      ReportsJob.perform_later if run_id.nil? && user_id.nil?
+      if run_id.nil? && user_id.nil?
+        ReportsJob.perform_later
+        UncategorizedNoticeJob.perform_later
+      end
       return
     end
     if run_id.nil? && user_id.nil?
@@ -28,7 +32,7 @@ class CategorizeTransactionsJob < ApplicationJob
     end
 
     run, ids = run_id ? [ CategorizationRun.find(run_id), ids ] : start(User.find(user_id), limit: limit)
-    return ReportsJob.perform_later if run.finished?
+    return finished(run) if run.finished?
 
     batch_size ||= config.batch_size
     batch, rest = ids.first(batch_size), ids.drop(batch_size)
@@ -37,7 +41,7 @@ class CategorizeTransactionsJob < ApplicationJob
       self.class.perform_later(run_id: run.id, ids: rest, batch_size: batch_size)
     else
       run.update!(finished_at: Time.current)
-      ReportsJob.perform_later
+      finished(run)
     end
   rescue BankTransactions::Categorizer::Truncated => e
     raise if batch_size == 1
@@ -55,6 +59,11 @@ class CategorizeTransactionsJob < ApplicationJob
   private
 
   def config = Rails.configuration.x.categorizer
+
+  def finished(run)
+    ReportsJob.perform_later
+    UncategorizedNoticeJob.perform_later(user_id: run.user_id)
+  end
 
   # A new run over the user's oldest uncategorized booked transactions, leaving out the ones the
   # same model decided for this user recently under the same rules (a changed category

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_05_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_05_120000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -87,6 +87,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_100000) do
     t.bigint "transaction_category_id"
     t.bigint "loan_id"
     t.bigint "categorization_rule_id"
+    t.datetime "uncategorized_notified_at"
     t.index ["bank_account_id", "entry_reference"], name: "index_bank_transactions_on_bank_account_id_and_entry_reference", unique: true
     t.index ["bank_account_id", "occurred_on"], name: "index_bank_transactions_on_bank_account_id_and_occurred_on"
     t.index ["bank_account_id"], name: "index_bank_transactions_on_bank_account_id"

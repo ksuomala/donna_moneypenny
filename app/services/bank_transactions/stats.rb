@@ -87,7 +87,9 @@ module BankTransactions
     # largest first on that side; refunds and an investment's other side come last.
     def transactions(slice, side)
       rows =
-        if slice.uncategorized?
+        if slice.name == UNCATEGORIZED_CASH
+          cash_withdrawals.or(cash_logged)
+        elsif slice.uncategorized?
           scope.where(transaction_category_id: nil).where(amount: side == :income ? 0.01.. : ...0)
         else
           scope.joins(:transaction_category).merge(TransactionCategory.in_stats.where(name: slice.name, kind: slice.kind))
@@ -164,11 +166,8 @@ module BankTransactions
     # what was logged on manual accounts, minus how much the counted wallet balance grew. A wallet
     # counted only on one side of the range counts as unchanged. Below zero shows nothing.
     def uncategorized_cash_slices
-      cash = TransactionCategory.where(user: users, name: CASH, exclude_from_stats: true).select(:id)
-      wallets = ManualAccount.owned_by(users).to_a
-      on_wallets = scope.where(bank_account_id: wallets.map(&:id))
-      withdrawn = -scope.where(transaction_category_id: cash).where.not(bank_account_id: wallets.map(&:id)).sum(:amount)
-      logged = on_wallets.where(transaction_category_id: nil).or(on_wallets.where.not(transaction_category_id: cash)).sum(:amount)
+      withdrawn = -cash_withdrawals.sum(:amount)
+      logged = cash_logged.sum(:amount)
       kept = wallets.sum(BigDecimal(0)) do |wallet|
         before = wallet.balance_on(range.begin - 1)
         after = wallet.balance_on(range.end)
@@ -176,6 +175,18 @@ module BankTransactions
       end
       unaccounted = withdrawn + logged - kept
       unaccounted.positive? ? [ Slice.new(name: UNCATEGORIZED_CASH, amount: -unaccounted, kind: "uncategorized") ] : []
+    end
+
+    def wallets = @wallets ||= ManualAccount.owned_by(users).to_a
+    def cash_category_ids = @cash_category_ids ||= TransactionCategory.where(user: users, name: CASH, exclude_from_stats: true).ids
+
+    def cash_withdrawals
+      scope.where(transaction_category_id: cash_category_ids).where.not(bank_account_id: wallets.map(&:id))
+    end
+
+    def cash_logged
+      on_wallets = scope.where(bank_account_id: wallets.map(&:id))
+      on_wallets.where(transaction_category_id: nil).or(on_wallets.where.not(transaction_category_id: cash_category_ids))
     end
 
     # In a household, a loan from one member to another (the creditor is another member, by

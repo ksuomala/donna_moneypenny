@@ -217,6 +217,8 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
 
     assert_equal [ [ "Uncategorized cash withdrawals", 85 ], [ "Groceries", 30 ], [ "Uncategorized", 5 ] ],
                  stats.expenses.map { [ it.name, it.amount ] }
+    cash_line = stats.expenses.find { it.name == "Uncategorized cash withdrawals" }
+    assert_equal [ -100, -30, -5, 20 ], stats.transactions(cash_line, :expense).map(&:amount)
   end
 
   test "cash still in the wallet by the counts is not spent" do

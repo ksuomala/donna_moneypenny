@@ -1,11 +1,26 @@
-# An account kept by hand, like cash: no bank connection, so nothing syncs into it and it has
-# no balance. Its transactions are added with record! (bin/rails transactions:create).
+# An account kept by hand, like cash: no bank connection, so nothing syncs into it. Its
+# transactions are added with record! (bin/rails transactions:create) and its balance is what
+# was counted (record_balance!, bin/rails accounts:record_balance).
 class ManualAccount < BankAccount
   validates :bank_connection, absence: true
 
   before_validation { self.uid ||= "manual-#{SecureRandom.uuid}" }
 
   def kind = "manual account"
+
+  # The latest count on or before the date, not moved by transactions: withdrawals land on the
+  # bank accounts, not here, so the logged rows alone can't carry a balance forward.
+  def balance_on(date)
+    balances.where(on: ..date).order(:on).last&.booked
+  end
+
+  # Replaces a count recorded for the same day.
+  def record_balance!(on:, balance:, dry_run: false)
+    count = balances.find_or_initialize_by(on: on)
+    count.assign_attributes(booked: balance, booked_type: "counted")
+    dry_run ? count.validate! : count.save!
+    count
+  end
 
   # A booked transaction in euros, optionally with a category of the account owner's.
   def record!(on:, amount:, counterparty: nil, description: nil, category: nil, dry_run: false)

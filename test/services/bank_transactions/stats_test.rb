@@ -187,4 +187,39 @@ class BankTransactions::StatsTest < ActiveSupport::TestCase
     theirs_only = BankTransactions::Stats.new(@range, users: [ other ])
     assert_equal [ [ "Housing", BigDecimal("2062.40") ], [ "Groceries", 50 ] ], theirs_only.expenses.map { [ it.name, it.amount ] }
   end
+
+  test "cash withdrawn and not logged on the wallet is an expense of its own" do
+    cash = TransactionCategory.create!(name: "Cash", exclude_from_stats: true)
+    wallet = ManualAccount.create!(name: "Cash", currency: "EUR")
+    txn(-100, cash)
+    txn(-50, cash, date: Date.new(2026, 9, 30))
+    wallet.record!(on: Date.new(2026, 10, 6), amount: -30, category: @groceries)
+    wallet.record!(on: Date.new(2026, 10, 7), amount: -5)
+    wallet.record!(on: Date.new(2026, 10, 8), amount: 20, counterparty: "K-Market")
+
+    assert_equal [ [ "Uncategorized cash withdrawals", 85 ], [ "Groceries", 30 ], [ "Uncategorized", 5 ] ],
+                 stats.expenses.map { [ it.name, it.amount ] }
+  end
+
+  test "cash still in the wallet by the counts is not spent" do
+    cash = TransactionCategory.create!(name: "Cash", exclude_from_stats: true)
+    wallet = ManualAccount.create!(name: "Cash", currency: "EUR")
+    txn(-100, cash)
+    wallet.record!(on: Date.new(2026, 10, 6), amount: -30, category: @groceries)
+    wallet.record_balance!(on: Date.new(2026, 9, 30), balance: 10)
+    wallet.record_balance!(on: Date.new(2026, 10, 20), balance: 60)
+
+    assert_equal [ [ "Uncategorized cash withdrawals", 20 ] ], stats.expenses.map { [ it.name, it.amount ] }.reject { it.first == "Groceries" }
+    assert_equal BigDecimal(60), wallet.balance_on(Date.new(2026, 10, 31))
+  end
+
+  test "no cash line when more was logged than withdrawn, or when Cash is still an expense" do
+    TransactionCategory.create!(name: "Cash", exclude_from_stats: true)
+    ManualAccount.create!(name: "Cash", currency: "EUR").record!(on: Date.new(2026, 10, 6), amount: -30, category: @groceries)
+    assert_equal [ "Groceries" ], stats.expenses.map(&:name)
+
+    TransactionCategory.where(name: "Cash").delete_all
+    txn(-100, TransactionCategory.create!(name: "Cash", kind: :expense))
+    assert_equal [ "Cash", "Groceries" ], stats.expenses.map(&:name)
+  end
 end

@@ -81,9 +81,13 @@ bin/kamal app exec --reuse 'bin/rails accounts:balances'
 ```sh
 # Money that never goes through a bank, like cash, lives on a manual account (once per user).
 # Add its transactions by hand, in euros, money out negative; CATEGORY is optional, without it
-# the nightly categorizer picks the row up like any other.
+# the nightly categorizer picks the row up like any other. Record what was counted in the
+# wallet with record_balance. ATM withdrawals are the excluded Cash category on the bank side;
+# whatever was withdrawn and neither logged nor still counted in the wallet shows in the stats
+# as "Uncategorized cash withdrawals".
 bin/kamal app exec --reuse 'bin/rails accounts:create_manual NAME=Cash'
 bin/kamal app exec --reuse 'bin/rails transactions:create ACCOUNT=7 ON=2026-11-05 AMOUNT=-12.50 COUNTERPARTY="K-Market" CATEGORY=4 DRY_RUN=1'
+bin/kamal app exec --reuse 'bin/rails accounts:record_balance ACCOUNT=7 ON=2026-11-05 BALANCE=85.20 DRY_RUN=1'
 ```
 
 Every task above works on the owner's data. For another user, add `EMAIL=their@address` to the

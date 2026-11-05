@@ -24,6 +24,15 @@ namespace :accounts do
     puts "#{account.id}\t#{account.display_name}"
   end
 
+  desc "Record a manual account's counted balance on a day (replaces one recorded for the same day). " \
+       "ACCOUNT=id ON=2026-11-05 BALANCE=85.20 DRY_RUN=1 to preview. EMAIL=..."
+  task record_balance: :environment do
+    account = ManualAccount.where(user: acting_user).find(ENV.fetch("ACCOUNT"))
+    dry_run = ENV["DRY_RUN"].present?
+    count = account.record_balance!(on: Date.iso8601(ENV.fetch("ON")), balance: BigDecimal(ENV.fetch("BALANCE")), dry_run: dry_run)
+    puts "#{dry_run ? "Would record" : "Recorded"} #{account.display_name}: #{count.booked.to_s("F")} EUR on #{count.on}"
+  end
+
   desc "Print an account's booked transactions in a range, oldest first, with the balance after each (read-only). ACCOUNT=5 FROM=2026-10-01 TO=2026-10-15"
   task transactions: :environment do
     account = BankAccount.find(ENV.fetch("ACCOUNT"))

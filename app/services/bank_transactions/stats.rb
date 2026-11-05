@@ -10,8 +10,14 @@ module BankTransactions
   # is an income of 720, and an investment that cost more than it brought in shows as an expense. Uncategorized transactions count as "Uncategorized", money out as an
   # expense and money in as an income. Pending transactions are left out (every sync replaces
   # them), and so are categories excluded from stats.
+  #
+  # Cash: withdrawals go in an excluded category named Cash, and cash spending is logged on a
+  # manual account in its real category. Whatever was withdrawn in the range, not logged and not
+  # still in the wallet (by the counted balances) shows as "Uncategorized cash withdrawals".
   class Stats
     UNCATEGORIZED = "Uncategorized".freeze
+    CASH = "Cash".freeze
+    UNCATEGORIZED_CASH = "Uncategorized cash withdrawals".freeze
 
     # kind is the category's kind (expense, income or investment), or uncategorized.
     Slice = Data.define(:name, :amount, :kind) do
@@ -107,7 +113,7 @@ module BankTransactions
     end
 
     def slices
-      @slices ||= category_slices + uncategorized_slices
+      @slices ||= category_slices + uncategorized_slices + uncategorized_cash_slices
     end
 
     # Net sum per category, keeping only the sides that make sense for its kind: an expense
@@ -140,6 +146,24 @@ module BankTransactions
         amount = side.sum(:amount)
         Slice.new(name: UNCATEGORIZED, amount:, kind: "uncategorized") unless amount.zero?
       end
+    end
+
+    # Withdrawn (money out in an excluded Cash category, net of cash paid back in), plus the net of
+    # what was logged on manual accounts, minus how much the counted wallet balance grew. A wallet
+    # counted only on one side of the range counts as unchanged. Below zero shows nothing.
+    def uncategorized_cash_slices
+      cash = TransactionCategory.where(user: users, name: CASH, exclude_from_stats: true).select(:id)
+      wallets = ManualAccount.owned_by(users).to_a
+      on_wallets = scope.where(bank_account_id: wallets.map(&:id))
+      withdrawn = -scope.where(transaction_category_id: cash).where.not(bank_account_id: wallets.map(&:id)).sum(:amount)
+      logged = on_wallets.where(transaction_category_id: nil).or(on_wallets.where.not(transaction_category_id: cash)).sum(:amount)
+      kept = wallets.sum(BigDecimal(0)) do |wallet|
+        before = wallet.balance_on(range.begin - 1)
+        after = wallet.balance_on(range.end)
+        before && after ? after - before : 0
+      end
+      unaccounted = withdrawn + logged - kept
+      unaccounted.positive? ? [ Slice.new(name: UNCATEGORIZED_CASH, amount: -unaccounted, kind: "uncategorized") ] : []
     end
 
     # In a household, a loan from one member to another (the creditor is another member, by

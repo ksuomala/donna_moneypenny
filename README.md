@@ -37,6 +37,9 @@ bin/rails transactions:categorize ASSIGN="101=4,102=4,103=16"
 ```
 
 Writes only ever fill in what is missing, so anything you categorised by hand stays as it is.
+Cash and other money outside the banks goes on a manual account
+(`bin/rails accounts:create_manual NAME=Cash`), whose transactions you add with
+`bin/rails transactions:create ACCOUNT=7 ON=2026-11-05 AMOUNT=-12.50 COUNTERPARTY="K-Market" CATEGORY=4`.
 A ready-made [Claude Code skill](.claude/skills/categorize-transactions/SKILL.md) runs this
 workflow end to end.
 

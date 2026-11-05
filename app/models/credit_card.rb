@@ -4,6 +4,8 @@
 class CreditCard < BankAccount
   def credit_card? = true
 
+  def kind = "credit card"
+
   def owed_on(date)
     booked = balance_on(date)
     -booked if booked

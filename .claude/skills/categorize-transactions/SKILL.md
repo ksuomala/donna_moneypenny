@@ -78,6 +78,14 @@ bin/kamal app exec --reuse 'bin/rails bank:sync'
 bin/kamal app exec --reuse 'bin/rails accounts:balances'
 ```
 
+```sh
+# Money that never goes through a bank, like cash, lives on a manual account (once per user).
+# Add its transactions by hand, in euros, money out negative; CATEGORY is optional, without it
+# the nightly categorizer picks the row up like any other.
+bin/kamal app exec --reuse 'bin/rails accounts:create_manual NAME=Cash'
+bin/kamal app exec --reuse 'bin/rails transactions:create ACCOUNT=7 ON=2026-11-05 AMOUNT=-12.50 COUNTERPARTY="K-Market" CATEGORY=4 DRY_RUN=1'
+```
+
 Every task above works on the owner's data. For another user, add `EMAIL=their@address` to the
 command: every `transactions:*`, `rules:*` and `categories:*` task then acts for that user, on
 their transactions, categories, rules, loans and runs. `bank:sync` and `accounts:balances` cover

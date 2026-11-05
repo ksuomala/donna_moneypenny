@@ -43,6 +43,21 @@ namespace :telegram do
     end
   end
 
+  desc "The notice of transactions still without a category, as it follows the categorizer's run. EMAIL=... for one user, " \
+       "otherwise everyone with categories; DRY_RUN=1 prints it instead of sending (a real send marks them listed)"
+  task uncategorized: :environment do
+    users = ENV["EMAIL"] ? [ telegram_owner ] : User.categorizing.to_a
+    users.each do |user|
+      notice = Telegram::UncategorizedNotice.new(user)
+      if ENV["DRY_RUN"].present?
+        due = notice.due
+        puts "--- #{user.email_address} -> #{Telegram::Chats.for(user).join(", ").presence || "nobody"}", (due.any? ? notice.text(due) : "nothing to list"), ""
+      else
+        puts "#{user.email_address}: #{notice.send!.any? ? "sent" : "nothing sent"}"
+      end
+    end
+  end
+
   def telegram_owner
     if ENV["HOUSEHOLD"].present?
       Household.find_by!(name: ENV["HOUSEHOLD"].strip)

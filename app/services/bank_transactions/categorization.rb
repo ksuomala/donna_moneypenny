@@ -33,7 +33,7 @@ module BankTransactions
       end
 
       lines << "" << "# accounts: id, name, kind"
-      user.bank_accounts.order(:id).each { |account| lines << row(account.id, account.display_name, account.credit_card? ? "credit card" : "account") }
+      user.bank_accounts.order(:id).each { |account| lines << row(account.id, account.display_name, account.kind) }
 
       lines << "" << "# known counterparties: counterparty, account id, category, count"
       names = TransactionCategory.where(user: user).pluck(:id, :name).to_h

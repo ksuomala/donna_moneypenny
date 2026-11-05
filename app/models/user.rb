@@ -1,9 +1,9 @@
 # Someone who signs in. Each user has their own bank connections, categories, rules, loans and
-# categorizer runs; accounts, transactions and balances belong to a user through a connection.
+# categorizer runs and accounts; transactions and balances belong to a user through an account.
 # Created with bin/rails users:create; there is no sign-up page.
 class User < ApplicationRecord
   # The models with a user_id.
-  OWNED_MODELS = %w[BankConnection TransactionCategory CategorizationRule CategorizationRun Loan Expense Income].freeze
+  OWNED_MODELS = %w[BankConnection BankAccount TransactionCategory CategorizationRule CategorizationRun Loan Expense Income].freeze
 
   has_secure_password
   belongs_to :household, optional: true
@@ -13,7 +13,7 @@ class User < ApplicationRecord
   has_one :enable_banking_app, dependent: :destroy
 
   has_many :bank_connections
-  has_many :bank_accounts, through: :bank_connections
+  has_many :bank_accounts
   has_many :bank_transactions, through: :bank_accounts
   has_many :transaction_categories
   has_many :categorization_rules

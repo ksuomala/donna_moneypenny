@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_26_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_05_120000) do
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -29,7 +29,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_120000) do
   end
 
   create_table "bank_accounts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
-    t.bigint "bank_connection_id", null: false
+    t.bigint "bank_connection_id"
+    t.bigint "user_id"
     t.string "uid", null: false
     t.string "iban"
     t.string "name"
@@ -45,6 +46,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_120000) do
     t.index ["identification_hash"], name: "index_bank_accounts_on_identification_hash"
     t.index ["type"], name: "index_bank_accounts_on_type"
     t.index ["uid"], name: "index_bank_accounts_on_uid", unique: true
+    t.index ["user_id"], name: "index_bank_accounts_on_user_id"
   end
 
   create_table "bank_connections", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -85,6 +87,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_120000) do
     t.bigint "transaction_category_id"
     t.bigint "loan_id"
     t.bigint "categorization_rule_id"
+    t.datetime "uncategorized_notified_at"
     t.index ["bank_account_id", "entry_reference"], name: "index_bank_transactions_on_bank_account_id_and_entry_reference", unique: true
     t.index ["bank_account_id", "occurred_on"], name: "index_bank_transactions_on_bank_account_id_and_occurred_on"
     t.index ["bank_account_id"], name: "index_bank_transactions_on_bank_account_id"
@@ -323,6 +326,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_26_120000) do
 
   add_foreign_key "bank_account_balances", "bank_accounts"
   add_foreign_key "bank_accounts", "bank_connections"
+  add_foreign_key "bank_accounts", "users"
   add_foreign_key "bank_connections", "enable_banking_apps"
   add_foreign_key "bank_connections", "users"
   add_foreign_key "bank_transactions", "bank_accounts"

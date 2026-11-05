@@ -18,6 +18,21 @@ namespace :bank do
 end
 
 namespace :accounts do
+  desc "Create an account kept by hand, like cash, for the acting user. NAME=Cash EMAIL=..."
+  task create_manual: :environment do
+    account = ManualAccount.create!(user: acting_user, name: ENV.fetch("NAME"), currency: "EUR")
+    puts "#{account.id}\t#{account.display_name}"
+  end
+
+  desc "Record a manual account's counted balance on a day (replaces one recorded for the same day). " \
+       "ACCOUNT=id ON=2026-11-05 BALANCE=85.20 DRY_RUN=1 to preview. EMAIL=..."
+  task record_balance: :environment do
+    account = ManualAccount.where(user: acting_user).find(ENV.fetch("ACCOUNT"))
+    dry_run = ENV["DRY_RUN"].present?
+    count = account.record_balance!(on: Date.iso8601(ENV.fetch("ON")), balance: BigDecimal(ENV.fetch("BALANCE")), dry_run: dry_run)
+    puts "#{dry_run ? "Would record" : "Recorded"} #{account.display_name}: #{count.booked.to_s("F")} EUR on #{count.on}"
+  end
+
   desc "Print an account's booked transactions in a range, oldest first, with the balance after each (read-only). ACCOUNT=5 FROM=2026-10-01 TO=2026-10-15"
   task transactions: :environment do
     account = BankAccount.find(ENV.fetch("ACCOUNT"))
@@ -44,14 +59,14 @@ namespace :accounts do
       on = Date.iso8601(ENV["ON"])
       puts "# id, name, kind, booked balance on #{on} (the latest snapshot on or before it, moved by the transactions since)"
       BankAccount.order(:id).each do |account|
-        puts [ account.id, account.display_name, account.credit_card? ? "credit card" : "account",
+        puts [ account.id, account.display_name, account.kind,
                account.balance_on(on)&.to_s("F") || "unknown" ].join("\t")
       end
     else
       puts "# id, name, kind, snapshot date, booked, booked type, available, available type, credit limit"
       BankAccount.order(:id).each do |account|
         latest = account.balances.order(:on).last
-        puts [ account.id, account.display_name, account.credit_card? ? "credit card" : "account",
+        puts [ account.id, account.display_name, account.kind,
                latest&.on, latest&.booked&.to_s("F") || "unknown", latest&.booked_type, latest&.available&.to_s("F"), latest&.available_type,
                (account.credit_limit&.to_s("F") if account.credit_card?) ].join("\t")
       end

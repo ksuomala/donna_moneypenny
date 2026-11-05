@@ -20,7 +20,7 @@
   [ "Shopping", "expense", "Clothing, shoes and other shopping." ],
   [ "Car", "expense", "Costs of owning a car: fuel, vehicle tax, insurance, parking, parts and repairs. Buying a car is a Value purchase." ],
   [ "Transport", "expense", "Getting around without your own car: taxis, ride-hailing, trains, buses, ferries." ],
-  [ "Cash", "expense", "ATM withdrawals, including any withdrawal fee." ],
+  [ "Cash", "excluded", "Cash moved between your bank accounts and your wallet: ATM withdrawals and cash paid in. Not spending: what's spent in cash is logged on the Cash account in its real category, and what isn't logged shows as Uncategorized cash withdrawals. A withdrawal fee on its own row is a bank fee, not Cash. Never use Cash for rows on the Cash account." ],
   [ "Fees & taxes", "expense", "Bank fees, parking tickets, taxes." ],
   [ "Health", "expense", "Pharmacy, doctor, dentist, physiotherapist, personal trainer." ],
   [ "Hobbies", "expense", "Sports and gym memberships, music, museums, other hobbies." ],

@@ -1,13 +1,15 @@
 # An account the user connected through Enable Banking. Credit cards are CreditCard
-# (single-table inheritance, chosen from the bank's account type when the account is attached).
+# (single-table inheritance, chosen from the bank's account type when the account is attached);
+# accounts kept by hand, like cash, are ManualAccount and have no connection.
 class BankAccount < ApplicationRecord
-  belongs_to :bank_connection
+  belongs_to :bank_connection, optional: true
+  belongs_to :user, optional: true, default: -> { bank_connection&.user || Current.user || User.owner }
   has_many :bank_transactions, dependent: :destroy
   has_many :balances, class_name: "BankAccountBalance", dependent: :destroy
 
   validates :uid, presence: true, uniqueness: true
 
-  scope :owned_by, ->(user) { joins(:bank_connection).where(bank_connections: { user_id: user }) }
+  scope :owned_by, ->(user) { where(user: user) }
 
   # Current and savings accounts, i.e. not credit cards.
   scope :deposit, -> { where(type: [ nil, "BankAccount" ]) }
@@ -18,6 +20,8 @@ class BankAccount < ApplicationRecord
   end
 
   def credit_card? = false
+
+  def kind = "account"
 
   # Account type plus the last digits of the IBAN, e.g. "Käyttötili …3458".
   def display_name

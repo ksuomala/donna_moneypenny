@@ -23,6 +23,19 @@ namespace :transactions do
     puts "Skipped (already categorized, pending or missing): #{result.skipped.join(", ")}" if result.skipped.any?
   end
 
+  desc "Add a transaction to a manual account (cash), in euros, money out negative. " \
+       "ACCOUNT=id ON=2026-11-05 AMOUNT=-12.50 COUNTERPARTY=... DESCRIPTION=... CATEGORY=id DRY_RUN=1 to preview. EMAIL=... for another user"
+  task create: :environment do
+    account = ManualAccount.where(user: acting_user).find(ENV.fetch("ACCOUNT"))
+    category = TransactionCategory.where(user: acting_user).find(ENV["CATEGORY"]) if ENV["CATEGORY"].present?
+    dry_run = ENV["DRY_RUN"].present?
+    transaction = account.record!(on: Date.iso8601(ENV.fetch("ON")), amount: BigDecimal(ENV.fetch("AMOUNT")),
+                                  counterparty: ENV["COUNTERPARTY"], description: ENV["DESCRIPTION"], category: category, dry_run: dry_run)
+
+    puts "#{dry_run ? "Would add" : "Added #{transaction.id}:"} #{transaction.occurred_on} #{transaction.amount.to_s("F")} EUR on #{account.display_name}, " \
+         "#{[ transaction.counterparty_name, transaction.description ].compact.join(" / ").presence || "no counterparty"}, #{category&.name || "uncategorized"}"
+  end
+
   desc "Move transactions to another category, also ones already categorized (the user's explicit decision; a loan link is dropped). " \
        "ASSIGN=\"transaction_id=category_id,...\" DRY_RUN=1 to preview. EMAIL=... for another user"
   task recategorize: :environment do

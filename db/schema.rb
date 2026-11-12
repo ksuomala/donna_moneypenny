@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_140000) do
   create_table "api_tokens", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "name", null: false
@@ -331,6 +331,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_120000) do
     t.bigint "household_id"
     t.string "telegram_chat_id"
     t.datetime "weekly_report_sent_at"
+    t.text "telegram_bot_token"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
     t.index ["household_id"], name: "index_users_on_household_id"
   end

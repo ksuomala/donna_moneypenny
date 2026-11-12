@@ -20,7 +20,7 @@ end
 class UnstubbedTelegram
   def send_message(**) = raise("Telegram::Client called without a stub client in a test")
 end
-Telegram::Client.factory = -> { UnstubbedTelegram.new }
+Telegram::Client.factory = ->(_token) { UnstubbedTelegram.new }
 
 module ActiveSupport
   class TestCase

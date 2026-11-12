@@ -30,8 +30,8 @@ module Telegram
 
     # Sends to the owner's chats and records the send; returns the messages as Telegram
     # describes them.
-    def send!(client: Client.for)
-      Chats.for(owner).map { |chat_id| client.send_message(chat_id: chat_id, text: text) }.tap do |sent|
+    def send!
+      Chats.recipients(owner).map { |recipient| recipient.send_message(text) }.tap do |sent|
         owner.update!(weekly_report_sent_at: Time.current) if sent.any?
       end
     end

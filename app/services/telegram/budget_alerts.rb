@@ -49,13 +49,13 @@ module Telegram
 
     # Sends what is due and returns the alerts sent. The thresholds below the one reported are
     # recorded with it, so they are never reported afterwards.
-    def send!(client: Client.for)
+    def send!
       due.each do |alert|
         BudgetAlert.transaction do
           thresholds.select { |t| t <= alert.threshold }.each do |t|
             alert.budget.alerts.find_or_create_by!(row_name: ROW, month: alert.month, threshold: t)
           end
-          Chats.for(alert.budget.owner).each { |chat_id| client.send_message(chat_id: chat_id, text: text(alert)) }
+          Chats.recipients(alert.budget.owner).each { |recipient| recipient.send_message(text(alert)) }
         end
       end
     end

@@ -27,7 +27,7 @@ class Telegram::UncategorizedNoticeTest < ActiveSupport::TestCase
     guess(shop, @groceries)
 
     TelegramStub.with do |stub|
-      Telegram::UncategorizedNotice.new(@user).send!(client: stub)
+      Telegram::UncategorizedNotice.new(@user).send!
       text = stub.messages.sole.text
 
       assert_equal "111", stub.messages.sole.chat_id
@@ -40,11 +40,11 @@ class Telegram::UncategorizedNoticeTest < ActiveSupport::TestCase
       assert_not_includes text, "older"
       assert [ shop, steam ].all? { |t| t.reload.uncategorized_notified_at }
 
-      Telegram::UncategorizedNotice.new(@user).send!(client: stub)
+      Telegram::UncategorizedNotice.new(@user).send!
       assert_equal 1, stub.messages.size, "listed again"
 
       txn("New")
-      Telegram::UncategorizedNotice.new(@user).send!(client: stub)
+      Telegram::UncategorizedNotice.new(@user).send!
       assert_includes stub.messages.last.text, "<b>1 transaction I couldn’t categorize</b>"
       assert_includes stub.messages.last.text, "2 older ones are still uncategorized."
     end
@@ -62,13 +62,23 @@ class Telegram::UncategorizedNoticeTest < ActiveSupport::TestCase
   test "sends nothing and marks nothing without a chat or a failed send" do
     shop = txn("K-Market")
     @user.update!(telegram_chat_id: nil)
-    TelegramStub.with { |stub| assert_empty Telegram::UncategorizedNotice.new(@user).send!(client: stub); assert_empty stub.messages }
+    TelegramStub.with { |stub| assert_empty Telegram::UncategorizedNotice.new(@user).send!; assert_empty stub.messages }
     assert_nil shop.reload.uncategorized_notified_at
 
     @user.update!(telegram_chat_id: "111")
-    assert_raises(Telegram::Client::Error) do
-      Telegram::UncategorizedNotice.new(@user).send!(client: TelegramStub.new(raises: Telegram::Client::Error.new("down")))
+    TelegramStub.with(TelegramStub.new(raises: Telegram::Client::Error.new("down"))) do
+      assert_raises(Telegram::Client::Error) { Telegram::UncategorizedNotice.new(@user).send! }
     end
     assert_nil shop.reload.uncategorized_notified_at
+  end
+
+  test "goes out with the user's own bot when they have one" do
+    @user.update!(telegram_bot_token: "123456:own-bot_token")
+    txn("K-Market")
+
+    TelegramStub.with do |stub|
+      Telegram::UncategorizedNotice.new(@user).send!
+      assert_equal [ "111", "123456:own-bot_token" ], [ stub.messages.sole.chat_id, stub.messages.sole.token ]
+    end
   end
 end

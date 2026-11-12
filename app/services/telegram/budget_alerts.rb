@@ -11,6 +11,12 @@ module Telegram
 
     Alert = Data.define(:budget, :row, :threshold, :month)
 
+    # An owner's budget this month: the report, the thresholds its total has passed and the
+    # ones already reported.
+    Status = Data.define(:budget, :report, :reached, :reported) do
+      def total = report.total
+    end
+
     attr_reader :today, :thresholds
 
     def initialize(today: Format.today, thresholds: Rails.configuration.x.telegram.budget_thresholds)
@@ -24,16 +30,21 @@ module Telegram
     def due
       owners = User.where(id: Budget.select(:user_id)).to_a + Household.where(id: Budget.select(:household_id)).to_a
       owners.filter_map do |owner|
-        budget = Budget.applying_to(owner, month)
-        next unless budget && Chats.for(owner).any?
+        next unless Chats.for(owner).any? && (status = status(owner))
 
-        total = BudgetReport.for(budget, BankTransactions::Stats.new(month, users: Chats.members(owner)))&.total
-        next unless total
-
-        sent = budget.alerts.where(month: month.begin, row_name: ROW).pluck(:threshold)
-        threshold = thresholds.select { |t| total.percent >= t }.max
-        Alert.new(budget: budget, row: total, threshold: threshold, month: month.begin) if threshold && sent.exclude?(threshold)
+        threshold = status.reached.max
+        Alert.new(budget: status.budget, row: status.total, threshold: threshold, month: month.begin) if threshold && status.reported.exclude?(threshold)
       end
+    end
+
+    # nil without a budget in force this month or without a monthly total.
+    def status(owner)
+      budget = Budget.applying_to(owner, month)
+      report = BudgetReport.for(budget, BankTransactions::Stats.new(month, users: Chats.members(owner))) if budget
+      return unless report&.total
+
+      Status.new(budget: budget, report: report, reached: thresholds.select { |t| report.total.percent >= t },
+                 reported: budget.alerts.where(month: month.begin, row_name: ROW).pluck(:threshold))
     end
 
     # Sends what is due and returns the alerts sent. The thresholds below the one reported are

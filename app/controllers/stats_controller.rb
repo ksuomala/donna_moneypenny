@@ -24,6 +24,7 @@ class StatsController < ApplicationController
         custom_range
       end
     @stats = BankTransactions::Stats.new(@range, users: @scope == "household" ? @members : [ Current.user ])
+    @net_worth = BankTransactions::NetWorth.new(users: @stats.users).call
     # The budget in force for the period, for this scope; the form edits it, or starts a new one.
     @budget_owner = @scope == "household" ? Current.user.household : Current.user
     @budget = Budget.applying_to(@budget_owner, @range)

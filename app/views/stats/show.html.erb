@@ -4,6 +4,8 @@
   <nav class="page-nav"><%= link_to "Bank connections", root_path %><%= button_to "Sign out", session_path, method: :delete, class: "link-button", form_class: "button-to" %></nav>
 
   <h1>Stats</h1>
+  <% if notice %><p class="flash flash-notice"><%= notice %></p><% end %>
+  <% if alert %><p class="flash flash-alert"><%= alert %></p><% end %>
   <p class="muted stats-period"><%= stats_period_label(@range) %></p>
 
   <nav class="month-tabs" aria-label="Months" data-controller="scroll-to-current">
@@ -49,6 +51,10 @@
 
   <div class="stat-tiles">
     <div class="stat-tile">
+      <span class="muted">Estimated net worth</span>
+      <strong><%= money(@net_worth.amount) %></strong>
+    </div>
+    <div class="stat-tile">
       <span class="muted">Income</span>
       <strong><%= money(@stats.income_total) %></strong>
     </div>
@@ -61,6 +67,12 @@
       <strong><%= money(@stats.net) %></strong>
     </div>
   </div>
+
+  <p class="muted ledger-note">Accounts <%= money(@net_worth.assets) %> − loans and credit cards <%= money(@net_worth.liabilities) %>. Estimates use the latest balance record plus booked transactions on later dates where available.</p>
+  <% if @net_worth.unknown_balance_count.positive? %>
+    <p class="muted ledger-note">Net worth excludes <%= pluralize(@net_worth.unknown_balance_count, "balance") %> without a recorded amount.</p>
+  <% end %>
+  <%= button_to "Refresh bank balances", balance_refreshes_path, params: { scope: @scope }, class: "button" %>
 
   <%= render "budget", report: @budget_report, budget: @budget, form_budget: @budget_form, categories: @budget_categories %>
 

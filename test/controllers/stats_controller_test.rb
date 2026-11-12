@@ -176,6 +176,22 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".month-tab-active", @today.strftime("%b %y")
   end
 
+  test "shows net worth as assets minus loan and card balances with a refresh button" do
+    @account.balances.create!(on: @today, booked: 100)
+    cash = ManualAccount.create!(user: @user, name: "Cash", currency: "EUR")
+    cash.record_balance!(on: @today, balance: 300)
+    loan = @user.loans.create!(name: "Mortgage", creditor: "Nordea")
+    loan.balances.create!(on: @today, balance: 200)
+    card = CreditCard.create!(bank_connection: @account.bank_connection, uid: "card", currency: "EUR")
+    card.balances.create!(on: @today, booked: -50)
+
+    get stats_path
+
+    assert_response :success
+    assert_select ".stat-tile", text: /Estimated net worth\s+150,00 €/
+    assert_select "form[action='#{balance_refreshes_path}'] button", "Refresh bank balances"
+  end
+
   test "loans are listed below income and expenses" do
     loan = @user.loans.create!(name: "Mortgage", creditor: "Nordea")
     loan.balances.create!(on: @today.beginning_of_month - 1, balance: 250_000)

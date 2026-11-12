@@ -41,6 +41,14 @@ class ManualAccountTest < ActiveSupport::TestCase
     end
   end
 
+  test "balance moves forward from the latest count by booked transactions on later dates" do
+    @cash.record_balance!(on: Date.new(2026, 11, 1), balance: 100)
+    @cash.record!(on: Date.new(2026, 11, 1), amount: -10, category: @groceries)
+    @cash.record!(on: Date.new(2026, 11, 2), amount: -15, category: @groceries)
+
+    assert_equal BigDecimal("85"), @cash.balance_on(Date.new(2026, 11, 3))
+  end
+
   test "refuses another user's category and a parent category" do
     theirs = users(:two).transaction_categories.create!(name: "Groceries", kind: :expense)
     parent = @owner.transaction_categories.create!(name: "Investment", kind: :expense)

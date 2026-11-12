@@ -25,6 +25,7 @@ Rails.application.routes.draw do
   resource :session, only: %i[new create destroy]
 
   resource :stats, only: :show
+  resources :balance_refreshes, only: :create
   # Budgets are created and edited on the stats page
   resources :budgets, only: %i[create update destroy]
 

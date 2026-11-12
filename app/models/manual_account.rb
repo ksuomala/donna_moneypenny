@@ -8,10 +8,12 @@ class ManualAccount < BankAccount
 
   def kind = "manual account"
 
-  # The latest count on or before the date, not moved by transactions: withdrawals land on the
-  # bank accounts, not here, so the logged rows alone can't carry a balance forward.
+  # The latest count on or before the date, moved forward by transactions since it.
   def balance_on(date)
-    balances.where(on: ..date).order(:on).last&.booked
+    snapshot = balances.where(on: ..date).order(:on).last
+    return unless snapshot
+
+    snapshot.booked + bank_transactions.booked.where(occurred_on: (snapshot.on + 1)..date).sum(:amount)
   end
 
   # Replaces a count recorded for the same day.

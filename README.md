@@ -95,6 +95,31 @@ bin/rails telegram:uncategorized DRY_RUN=1
 
 `BUDGET_ALERT_THRESHOLDS` (default `50,100`) sets the percentages.
 
+## Agent API
+
+`/api` is a JSON API for agents such as Hermes. A request carries a bearer token that belongs to
+one user and sees and changes only that user's data (`scope=household` on stats and budget
+status combines the household, as on the stats page). Only a digest of the token is stored, so it is shown once.
+
+```sh
+bin/rails api_tokens:create NAME=hermes EMAIL=you@example.com  # or without EMAIL: one per user
+bin/rails api_tokens:list
+bin/rails api_tokens:revoke ID=3
+curl -H "Authorization: Bearer donna_..." "https://your-host/api/stats?from=2026-10-01&to=2026-10-31"
+```
+
+| Endpoint | |
+|---|---|
+| `GET /api/stats?from=2026-10-01&to=2026-10-31` | Income and spending per category for the range (dates, both included), with the budget prorated to it |
+| `GET /api/budget_status` | This month's budget, the alert thresholds passed and the ones already sent |
+| `GET /api/uncategorized_transactions?limit=50` | Booked transactions without a category, with the categorizer's guess |
+| `POST /api/categorizations` | `{"assignments": [{"transaction_id": 1, "category_id": 2}], "dry_run": false}`; fills in blanks only |
+| `GET /api/categories`, `POST /api/categories` | `{"name", "kind", "parent", "description"}`; a taken name is refused |
+| `GET /api/accounts`, `POST /api/accounts` | `{"name"}` creates a manual account (cash) |
+| `POST /api/transactions` | `{"account_id", "date", "amount", "counterparty", "description", "category_id"}` on a manual account |
+
+Reading the budget status or the uncategorized list doesn't count as sending them on Telegram. Errors come back as `{"error": "..."}`.
+
 ## Users
 
 Every page needs a sign-in (Rails' built-in authentication). There is no sign-up page and no

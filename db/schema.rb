@@ -10,7 +10,18 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_05_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_120000) do
+  create_table "api_tokens", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "name", null: false
+    t.string "token_digest", null: false
+    t.datetime "last_used_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["token_digest"], name: "index_api_tokens_on_token_digest", unique: true
+    t.index ["user_id", "name"], name: "index_api_tokens_on_user_id_and_name", unique: true
+  end
+
   create_table "bank_account_balances", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "bank_account_id", null: false
     t.date "on", null: false
@@ -324,6 +335,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_120000) do
     t.index ["household_id"], name: "index_users_on_household_id"
   end
 
+  add_foreign_key "api_tokens", "users"
   add_foreign_key "bank_account_balances", "bank_accounts"
   add_foreign_key "bank_accounts", "bank_connections"
   add_foreign_key "bank_accounts", "users"

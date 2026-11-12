@@ -10,6 +10,7 @@ class User < ApplicationRecord
   has_many :household_aliases, dependent: :destroy
   has_many :budgets, dependent: :destroy
   has_many :sessions, dependent: :destroy
+  has_many :api_tokens, dependent: :destroy
   has_one :enable_banking_app, dependent: :destroy
 
   has_many :bank_connections

@@ -29,5 +29,16 @@ Rails.application.routes.draw do
   # Budgets are created and edited on the stats page
   resources :budgets, only: %i[create update destroy]
 
+  # The agent API (Hermes): JSON, one bearer token per user (bin/rails api_tokens:create)
+  namespace :api do
+    resource :stats, only: :show
+    resource :budget_status, only: :show
+    resources :uncategorized_transactions, only: :index
+    resources :categorizations, only: :create
+    resources :categories, only: %i[index create]
+    resources :accounts, only: %i[index create]
+    resources :transactions, only: :create
+  end
+
   root "bank_connections#index"
 end

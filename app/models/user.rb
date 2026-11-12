@@ -23,10 +23,16 @@ class User < ApplicationRecord
   has_many :expenses
   has_many :incomes
 
+  # The bot this user's Telegram messages are sent with (Telegram::Chats), e.g. the one their own
+  # Hermes polls; without one, the default bot from the credentials.
+  encrypts :telegram_bot_token
+
   normalizes :email_address, with: ->(e) { e.strip.downcase }
+  normalizes :telegram_bot_token, with: ->(token) { token.strip.presence }
 
   validates :email_address, presence: true, uniqueness: true
   validates :password, length: { minimum: 12 }, allow_nil: true
+  validates :telegram_bot_token, format: { with: /\A\d+:[A-Za-z0-9_-]+\z/, message: "isn't a Telegram bot token" }, allow_nil: true
 
   # The first user: the default for rake tasks run without EMAIL=..., and the one who gets the
   # records from before there were users.

@@ -81,12 +81,15 @@ categorizer run, the user gets a list of the transactions still without a catego
 once, with ids to answer by (`transactions:categorize`). A user and a household
 each have a chat of their own; a household without one is reached through its members' chats.
 Any bot's token works, also one another program already uses for its own chat: sending doesn't
-interfere with receiving.
+interfere with receiving. A user can have a bot of their own (`telegram:bot`), such as the one their own
+Hermes polls, so their messages arrive in the chat with their assistant; everyone else, and a
+household's group chat, gets the default bot.
 
 ```sh
 bin/rails credentials:edit                                 # add telegram: bot_token: ...
 bin/rails telegram:link EMAIL=you@example.com CHAT_ID=123  # your chat with the bot
 bin/rails telegram:link HOUSEHOLD=Home CHAT_ID=-456        # a group with the bot in it
+bin/rails telegram:bot EMAIL=you@example.com              # send this user's messages with their own bot (asks for its token)
 bin/rails telegram:test EMAIL=you@example.com
 bin/rails telegram:weekly_report DRY_RUN=1                 # print instead of send
 bin/rails telegram:budget_alerts DRY_RUN=1

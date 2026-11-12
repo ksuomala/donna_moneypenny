@@ -20,15 +20,15 @@ module Telegram
 
     # Sends when anything is due and the user has a chat; returns the messages as Telegram
     # describes them.
-    def send!(client: Client.for)
+    def send!
       transactions = due
-      chats = Chats.for(user)
-      return [] if transactions.empty? || chats.empty?
+      recipients = Chats.recipients(user)
+      return [] if transactions.empty? || recipients.empty?
 
       message = text(transactions)
       BankTransaction.transaction do
         BankTransaction.where(id: transactions.map(&:id)).update_all(uncategorized_notified_at: Time.current)
-        chats.map { |chat_id| client.send_message(chat_id: chat_id, text: message) }
+        recipients.map { |recipient| recipient.send_message(message) }
       end
     end
 

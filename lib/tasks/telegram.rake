@@ -10,10 +10,19 @@ namespace :telegram do
   desc "Send a test message to a user's or a household's chat. EMAIL=... or HOUSEHOLD=name"
   task test: :environment do
     owner = telegram_owner
-    chats = Telegram::Chats.for(owner)
-    abort "#{Telegram::Chats.label(owner)} has no chat (telegram:link)" if chats.empty?
-    chats.each { |chat_id| Telegram::Client.for.send_message(chat_id: chat_id, text: "Donna Moneypenny here. Messages for #{Telegram::Format.escape(Telegram::Chats.label(owner))} arrive in this chat.") }
-    puts "Sent to #{chats.join(", ")}"
+    recipients = Telegram::Chats.recipients(owner)
+    abort "#{Telegram::Chats.label(owner)} has no chat (telegram:link)" if recipients.empty?
+    recipients.each { |recipient| recipient.send_message("Donna Moneypenny here. Messages for #{Telegram::Format.escape(Telegram::Chats.label(owner))} arrive in this chat.") }
+    puts "Sent to #{recipients.map(&:chat_id).join(", ")}"
+  end
+
+  desc "Send a user's messages with their own bot, e.g. the one their Hermes polls, instead of the default one. " \
+       "EMAIL=... (asks for the bot token, or BOT_TOKEN=... without a terminal; an empty one goes back to the default bot)"
+  task bot: :environment do
+    user = User.find_by!(email_address: ENV.fetch("EMAIL").strip.downcase)
+    token = ENV.key?("BOT_TOKEN") ? ENV["BOT_TOKEN"] : ($stdin.tty? ? $stdin.getpass("Bot token: ") : abort("No terminal to ask for the token: set BOT_TOKEN=..."))
+    user.update!(telegram_bot_token: token)
+    puts user.telegram_bot_token ? "#{user.email_address} gets its messages from its own bot" : "#{user.email_address} gets its messages from the default bot"
   end
 
   desc "The weekly report, as the reports job sends it after the first sync of the week. EMAIL=... or HOUSEHOLD=name for one, " \

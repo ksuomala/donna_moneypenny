@@ -9,10 +9,11 @@ module Telegram
 
     Error = Class.new(StandardError)
 
-    # Callers get their client through Client.for so tests can swap in a fake.
-    class_attribute :factory, default: -> { new }
+    # Callers get their client through Client.for so tests can swap in a fake. Without a token,
+    # the default bot's.
+    class_attribute :factory, default: ->(token) { new(token: token) }
 
-    def self.for = factory.call
+    def self.for(token = nil) = factory.call(token.presence || bot_token)
     def self.bot_token = Rails.application.credentials.dig(:telegram, :bot_token).presence || ENV["TELEGRAM_BOT_TOKEN"].presence
     def self.configured? = bot_token.present?
 

@@ -10,13 +10,12 @@ class ReportsJob < ApplicationJob
 
   def perform
     failures = []
-    client = Telegram::Client.for
 
     Telegram::Chats.owners.each do |owner|
       report = Telegram::WeeklyReport.new(owner)
       next unless report.due?
 
-      report.send!(client: client)
+      report.send!
       Rails.logger.info("[telegram] weekly report sent for #{Telegram::Chats.label(owner)}")
     rescue StandardError => e
       failures << "#{Telegram::Chats.label(owner)}: #{e.message}"
@@ -24,7 +23,7 @@ class ReportsJob < ApplicationJob
     end
 
     begin
-      sent = Telegram::BudgetAlerts.new.send!(client: client)
+      sent = Telegram::BudgetAlerts.new.send!
       Rails.logger.info("[telegram] #{sent.size} budget alert(s) sent") if sent.any?
     rescue StandardError => e
       failures << "budget alerts: #{e.message}"

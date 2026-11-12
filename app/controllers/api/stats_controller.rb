@@ -3,9 +3,7 @@ module Api
   # the budget in force prorated to the range. from and to are dates, both included.
   class StatsController < BaseController
     def show
-      range = Date.iso8601(params.require(:from))..Date.iso8601(params.require(:to))
-      raise ArgumentError, "from must not be after to" if range.begin > range.end
-
+      range = date_range
       stats = BankTransactions::Stats.new(range, users: Telegram::Chats.members(owner))
       budget = BudgetReport.for(Budget.applying_to(owner, range), stats)
 

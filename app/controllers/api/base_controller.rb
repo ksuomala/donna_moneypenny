@@ -33,6 +33,14 @@ module Api
 
     def scope_name = owner.is_a?(Household) ? "household" : "me"
 
+    # from and to as dates, both included.
+    def date_range
+      range = Date.iso8601(params.require(:from))..Date.iso8601(params.require(:to))
+      raise ArgumentError, "from must not be after to" if range.begin > range.end
+
+      range
+    end
+
     def dry_run? = ActiveModel::Type::Boolean.new.cast(params[:dry_run]) || false
 
     def render_error(message, status)

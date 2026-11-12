@@ -119,6 +119,7 @@ curl -H "Authorization: Bearer donna_..." "https://your-host/api/stats?from=2026
 | `POST /api/categorizations` | `{"assignments": [{"transaction_id": 1, "category_id": 2}], "dry_run": false}`; fills in blanks only |
 | `GET /api/categories`, `POST /api/categories` | `{"name", "kind", "parent", "description"}`; a taken name is refused |
 | `GET /api/accounts`, `POST /api/accounts` | `{"name"}` creates a manual account (cash) |
+| `GET /api/transactions?from=2026-10-01&to=2026-10-31` | Every transaction in the range, oldest first, with its account, status and category |
 | `POST /api/transactions` | `{"account_id", "date", "amount", "counterparty", "description", "category_id"}` on a manual account |
 
 Reading the budget status or the uncategorized list doesn't count as sending them on Telegram. Errors come back as `{"error": "..."}`.

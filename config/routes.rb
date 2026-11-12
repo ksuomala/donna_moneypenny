@@ -37,7 +37,7 @@ Rails.application.routes.draw do
     resources :categorizations, only: :create
     resources :categories, only: %i[index create]
     resources :accounts, only: %i[index create]
-    resources :transactions, only: :create
+    resources :transactions, only: %i[index create]
   end
 
   root "bank_connections#index"

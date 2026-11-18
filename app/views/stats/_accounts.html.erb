@@ -1,5 +1,8 @@
 <section class="stats-section">
-  <h2>Accounts <span class="muted"><%= money(total) %></span></h2>
+  <div class="section-heading">
+    <h2>Accounts <span class="muted"><%= money(total) %></span></h2>
+    <%= info_note do %>Balance as the bank last reported it on or before the end of the period. Credit cards are listed with the loans.<% end %>
+  </div>
 
   <% if rows.empty? %>
     <p class="muted">No accounts.</p>
@@ -31,6 +34,5 @@
         </tfoot>
       </table>
     </div>
-    <p class="muted ledger-note">Balance as the bank last reported it on or before the end of the period. Credit cards are listed with the loans.</p>
   <% end %>
 </section>

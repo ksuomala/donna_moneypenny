@@ -17,8 +17,12 @@ class BankTransactions::NetWorthTest < ActiveSupport::TestCase
     card = CreditCard.create!(bank_connection: connection, uid: "card", currency: "EUR")
     card.balances.create!(on: Date.new(2026, 11, 1), booked: -100)
 
-    result = BankTransactions::NetWorth.new(users: [ user ]).call
+    net_worth = BankTransactions::NetWorth.new(users: [ user ])
+    before_transaction = net_worth.call(at: Time.find_zone("Europe/Helsinki").local(2026, 11, 1, 12))
+    result = net_worth.call(at: Time.find_zone("Europe/Helsinki").local(2026, 11, 2, 12))
 
+    assert_equal BigDecimal("1200"), before_transaction.assets
+    assert_equal BigDecimal("700"), before_transaction.amount
     assert_equal BigDecimal("1130"), result.assets
     assert_equal BigDecimal("500"), result.liabilities
     assert_equal BigDecimal("630"), result.amount
@@ -34,5 +38,21 @@ class BankTransactions::NetWorthTest < ActiveSupport::TestCase
 
     assert_equal BigDecimal("0"), result.amount
     assert_equal 1, result.unknown_balance_count
+  end
+
+  test "history compares net worth at one, three, six and twelve months ago" do
+    user = users(:one)
+    connection = user.bank_connections.create!(session_id: "s", aspsp_name: "Nordea", aspsp_country: "FI", valid_until: 1.month.from_now)
+    account = connection.bank_accounts.create!(uid: "checking", currency: "EUR")
+    account.balances.create!(on: Date.new(2025, 11, 12), booked: 100)
+    account.balances.create!(on: Date.new(2026, 10, 12), booked: 130)
+    account.balances.create!(on: Date.new(2026, 11, 12), booked: 150)
+    at = Time.find_zone("Europe/Helsinki").local(2026, 11, 12, 12)
+
+    history = BankTransactions::NetWorthHistory.new(users: [ user ]).call(at:)
+
+    assert_equal [ 100, 100, 100, 130, 150 ], history.points.map(&:amount)
+    assert_equal [ "1 month", "Quarter", "6 months", "12 months" ], history.changes.map(&:label)
+    assert_equal [ 20, 50, 50, 50 ], history.changes.map(&:amount)
   end
 end

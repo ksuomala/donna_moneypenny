@@ -1,27 +1,98 @@
 .stats {
-  --surface: #ffffff;
-  --hairline: #e5e7eb;
-  --track: #f3f4f6;
-  --bar: #2a78d6;
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
-  --series-7: #4a3aa7;
-  --series-8: #e34948;
+  --bar: #3987e5;
+  --income: #199e70;
+  --expense: #d95926;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #2f9e2f;
+  --series-7: #9085e9;
+  --series-8: #e66767;
   --series-9: #0e9aa7;
-  --series-other: #9ca3af;
-  --series-uncategorized: #4b5563;
+  --series-other: #6b6b6b;
+  --series-uncategorized: #d4d4d4;
 }
 
 .stats h1 {
   margin-bottom: 0;
 }
 
+.period-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .stats-period {
-  margin-top: 0;
+  margin: 0;
+}
+
+.period-step {
+  padding: 0 0.5rem;
+  border: 1px solid var(--hairline);
+  color: inherit;
+  text-decoration: none;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.period-step:hover {
+  background: var(--track);
+}
+
+.period-step-disabled {
+  color: var(--hairline);
+}
+
+.dropdown {
+  position: relative;
+}
+
+.dropdown > summary,
+.other-period > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.view-options {
+  margin-left: auto;
+}
+
+.view-options > summary {
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--hairline);
+}
+
+.dropdown-body {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  display: grid;
+  gap: 0.75rem;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  margin-top: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+}
+
+.other-period {
+  margin: 0.5rem 0 1.5rem;
+}
+
+.other-period > summary {
+  color: var(--muted);
+}
+
+.other-period-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
 }
 
 .month-tabs {
@@ -35,7 +106,6 @@
 .month-tab {
   flex: none;
   padding: 0.3rem 0.45rem;
-  border-radius: 0.4rem;
   color: inherit;
   text-decoration: none;
   font-size: 0.9rem;
@@ -47,24 +117,17 @@
 }
 
 .month-tab-active {
-  background: #1d4ed8;
+  background: var(--accent);
   color: #fff;
 }
 
 .month-tab-active:hover {
-  background: #1e40af;
-}
-
-.stats-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1.5rem;
-  align-items: center;
-  margin: 1rem 0 1.5rem;
+  background: var(--accent-hover);
 }
 
 .quick-filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
@@ -80,7 +143,6 @@
 .chip {
   padding: 0.3rem 0.8rem;
   border: 1px solid var(--hairline);
-  border-radius: 999px;
   color: inherit;
   text-decoration: none;
   font-size: 0.9rem;
@@ -91,13 +153,13 @@
 }
 
 .chip-active {
-  border-color: #1d4ed8;
-  background: #1d4ed8;
+  border-color: var(--accent);
+  background: var(--accent);
   color: #fff;
 }
 
 .chip-active:hover {
-  background: #1e40af;
+  background: var(--accent-hover);
 }
 
 .timeline-filter {
@@ -115,7 +177,6 @@
 .timeline-filter input[type="date"] {
   padding: 0.3rem 0.4rem;
   border: 1px solid var(--hairline);
-  border-radius: 0.4rem;
   background: var(--surface);
   color: inherit;
   font: inherit;
@@ -127,7 +188,7 @@
 
 .stat-tiles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.5rem;
 }
@@ -137,7 +198,7 @@
   flex-direction: column;
   padding: 0.75rem 1rem;
   border: 1px solid var(--hairline);
-  border-radius: 0.5rem;
+  background: var(--surface);
 }
 
 .stat-tile .muted {
@@ -147,6 +208,68 @@
 .stat-tile strong {
   font-size: 1.3rem;
   white-space: nowrap;
+}
+
+.trend {
+  font-size: 0.8rem;
+}
+
+.trend-better,
+.amount-positive {
+  color: var(--positive);
+}
+
+.trend-worse,
+.amount-negative {
+  color: var(--negative);
+}
+
+.net-worth-now {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+}
+
+.net-worth-now .stat-tile {
+  flex: 1 1 14rem;
+}
+
+.section-heading {
+  position: relative;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.info > summary {
+  list-style: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.info > summary::-webkit-details-marker {
+  display: none;
+}
+
+.info[open] > summary {
+  color: var(--text);
+}
+
+.info-body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  font-size: 0.85rem;
+}
+
+.chart-scroll {
+  overflow-x: auto;
 }
 
 .tabs {
@@ -167,8 +290,57 @@
 }
 
 .tab[aria-selected="true"] {
-  border-bottom-color: #1d4ed8;
+  border-bottom-color: var(--accent);
   font-weight: 600;
+}
+
+.net-worth-chart {
+  display: block;
+  width: 100%;
+  min-width: 30rem;
+  overflow: visible;
+}
+
+.net-worth-grid {
+  stroke: var(--hairline);
+  stroke-width: 1;
+}
+
+.net-worth-label {
+  fill: var(--muted);
+  font-size: 14px;
+}
+
+.net-worth-line {
+  fill: none;
+  stroke: var(--bar);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.net-worth-point {
+  fill: var(--bar);
+  stroke: var(--background);
+  stroke-width: 2;
+}
+
+.net-worth-changes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.net-worth-change {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+}
+
+.net-worth-change strong {
+  font-variant-numeric: tabular-nums;
 }
 
 .stats-section {
@@ -216,8 +388,15 @@
   display: block;
   height: 100%;
   min-width: 2px;
-  border-radius: 0 4px 4px 0;
   background: var(--bar);
+}
+
+.bars-income .bar {
+  background: var(--income);
+}
+
+.bars-expense .bar {
+  background: var(--expense);
 }
 
 .bar-row-uncategorized .bar {
@@ -276,7 +455,6 @@
 .swatch {
   width: 0.75rem;
   height: 0.75rem;
-  border-radius: 3px;
 }
 
 .series-1 { fill: var(--series-1); background: var(--series-1); }
@@ -292,10 +470,6 @@
 .series-uncategorized { fill: var(--series-uncategorized); background: var(--series-uncategorized); }
 
 @media (max-width: 32rem) {
-  .stat-tiles {
-    grid-template-columns: 1fr;
-  }
-
   .bar-row {
     grid-template-columns: 1fr auto;
   }
@@ -303,25 +477,6 @@
   .bar-track {
     grid-column: 1 / -1;
     grid-row: 2;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  .stats {
-    --surface: #111827;
-    --hairline: #374151;
-    --track: #1f2937;
-    --bar: #3987e5;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --series-7: #9085e9;
-    --series-8: #e66767;
-    --series-other: #6b7280;
-    --series-uncategorized: #d1d5db;
   }
 }
 
@@ -409,7 +564,7 @@
 
 .budget-form-details summary {
   cursor: pointer;
-  color: #1d4ed8;
+  color: var(--link);
 }
 
 .budget-form {

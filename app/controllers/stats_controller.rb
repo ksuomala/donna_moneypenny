@@ -24,7 +24,11 @@ class StatsController < ApplicationController
         custom_range
       end
     @stats = BankTransactions::Stats.new(@range, users: @scope == "household" ? @members : [ Current.user ])
-    @net_worth = BankTransactions::NetWorth.new(users: @stats.users).call
+    @previous_range = shift(@range, -1)
+    @next_range = shift(@range, 1).then { |range| range if range.begin <= @today }
+    @previous_stats = BankTransactions::Stats.new(@previous_range, users: @stats.users)
+    @net_worth_history = BankTransactions::NetWorthHistory.new(users: @stats.users).call
+    @net_worth = @net_worth_history.current
     # The budget in force for the period, for this scope; the form edits it, or starts a new one.
     @budget_owner = @scope == "household" ? Current.user.household : Current.user
     @budget = Budget.applying_to(@budget_owner, @range)
@@ -40,6 +44,18 @@ class StatsController < ApplicationController
     when "week" then @today.all_week
     when "month" then @today.all_month
     when "year" then @today.all_year
+    end
+  end
+
+  # The period before or after: a whole month or year steps by one, any other range by its length.
+  def shift(range, by)
+    if range == range.begin.all_month
+      range.begin.months_since(by).all_month
+    elsif range == range.begin.all_year
+      range.begin.years_since(by).all_year
+    else
+      days = (range.end - range.begin).to_i + 1
+      (range.begin + by * days)..(range.end + by * days)
     end
   end
 

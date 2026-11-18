@@ -55,7 +55,9 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     get stats_path
 
     assert_select "details.bar-details summary.bar-row", 1
+    assert_select ".bar-label", text: /Groceries · 2/
     assert_select "details.bar-details table.transactions tbody tr", 2
+    assert_select "table.transactions tbody tr:first-child td:first-child", @today.strftime("%-d %b")
     assert_select "table.transactions tbody tr:first-child td.number", "-30,00 €"
     assert_select "table.transactions td", "K-Market"
   end
@@ -190,6 +192,37 @@ class StatsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select ".stat-tile", text: /Estimated net worth\s+150,00 €/
     assert_select "form[action='#{balance_refreshes_path}'] button", "Refresh bank balances"
+    assert_select "[role=tab]", "Net worth"
+    assert_select "[role=tabpanel][data-tab='net-worth'] svg.net-worth-chart"
+    assert_select "[role=tabpanel][data-tab='net-worth'] .net-worth-change", 4
+  end
+
+  test "refreshing bank balances is offered only on a period that includes today" do
+    get stats_path(month: @today.prev_month.strftime("%Y-%m"))
+
+    assert_select "form[action='#{balance_refreshes_path}']", 0
+  end
+
+  test "steps to the previous and next period" do
+    get stats_path
+
+    assert_select "a.period-step[href='#{stats_path(month: @today.prev_month.strftime("%Y-%m"))}']"
+    assert_select ".period-step-disabled"
+
+    get stats_path(from: "2026-01-01", to: "2026-01-10")
+
+    assert_select "a.period-step[href='#{stats_path(from: "2025-12-22", to: "2025-12-31")}']"
+    assert_select "a.period-step[href='#{stats_path(from: "2026-01-11", to: "2026-01-20")}']"
+  end
+
+  test "income and expenses compare with the previous period; net is signed" do
+    txn(-10, @today.prev_month.beginning_of_month)
+    txn(-20, @today.beginning_of_month)
+
+    get stats_path
+
+    assert_select ".stat-tile .trend-worse", "▲ 100 % vs #{@today.prev_month.strftime("%b")}"
+    assert_select ".stat-tile strong.amount-negative", "−20,00 €"
   end
 
   test "loans are listed below income and expenses" do

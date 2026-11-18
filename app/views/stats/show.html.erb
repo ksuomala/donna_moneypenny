@@ -6,7 +6,40 @@
   <h1>Stats</h1>
   <% if notice %><p class="flash flash-notice"><%= notice %></p><% end %>
   <% if alert %><p class="flash flash-alert"><%= alert %></p><% end %>
-  <p class="muted stats-period"><%= stats_period_label(@range) %></p>
+  <div class="period-header">
+    <%= link_to "‹", stats_range_path(@previous_range), class: "period-step", title: "Previous period", aria: { label: "Previous period" } %>
+    <p class="stats-period"><%= stats_period_label(@range) %></p>
+    <% if @next_range %>
+      <%= link_to "›", stats_range_path(@next_range), class: "period-step", title: "Next period", aria: { label: "Next period" } %>
+    <% else %>
+      <span class="period-step period-step-disabled" aria-hidden="true">›</span>
+    <% end %>
+
+    <details class="dropdown view-options">
+      <summary><%= [ (@scope == "household" ? Current.user.household.name : "Me" if @members.many?), @currency.code ].compact.join(" · ") %></summary>
+      <div class="dropdown-body">
+        <% if @members.many? %>
+          <div class="quick-filters scope-filter" role="group" aria-label="Whose">
+            <% { "me" => "Me", "household" => Current.user.household.name }.each do |scope, label| %>
+              <%= link_to label, stats_path(request.query_parameters.merge(scope: scope)), class: [ "chip", { "chip-active": @scope == scope } ], aria: { current: (@scope == scope ? "true" : nil) } %>
+            <% end %>
+            <% if @scope == "household" && @stats.internal_transfers.positive? %>
+              <span class="muted rate-note">between members, left out: <%= money(@stats.internal_transfers) %></span>
+            <% end %>
+          </div>
+        <% end %>
+
+        <div class="quick-filters currency-filter" role="group" aria-label="Currency">
+          <% DisplayCurrency::CODES.each do |code| %>
+            <%= link_to code, stats_path(request.query_parameters.merge(currency: code)), class: [ "chip", { "chip-active": @currency.code == code } ], aria: { current: (@currency.code == code ? "true" : nil) } %>
+          <% end %>
+          <% unless @currency.euros? %>
+            <span class="muted rate-note">1 € = <%= number_with_precision(@currency.rate, precision: 4, separator: ",") %> <%= @currency.unit %> (ECB, <%= l @currency.on, format: :long %>)</span>
+          <% end %>
+        </div>
+      </div>
+    </details>
+  </div>
 
   <nav class="month-tabs" aria-label="Months" data-controller="scroll-to-current">
     <% @months.each do |month| %>
@@ -15,64 +48,39 @@
     <% end %>
   </nav>
 
-  <div class="stats-filters">
-    <div class="quick-filters period-filters">
-      <% { "week" => "This week", "month" => "This month", "year" => "This year" }.each do |period, label| %>
-        <%= link_to label, stats_path(period: period), class: [ "chip", { "chip-active": @period == period } ], aria: { current: (@period == period ? "true" : nil) } %>
-      <% end %>
-    </div>
-
-    <% if @members.many? %>
-      <div class="quick-filters scope-filter" aria-label="Whose">
-        <% { "me" => "Me", "household" => Current.user.household.name }.each do |scope, label| %>
-          <%= link_to label, stats_path(request.query_parameters.merge(scope: scope)), class: [ "chip", { "chip-active": @scope == scope } ], aria: { current: (@scope == scope ? "true" : nil) } %>
-        <% end %>
-        <% if @scope == "household" && @stats.internal_transfers.positive? %>
-          <span class="muted rate-note">between members, left out: <%= money(@stats.internal_transfers) %></span>
+  <details class="other-period">
+    <summary>Other period</summary>
+    <div class="other-period-body">
+      <div class="quick-filters period-filters">
+        <% { "week" => "This week", "month" => "This month", "year" => "This year" }.each do |period, label| %>
+          <%= link_to label, stats_path(period: period), class: [ "chip", { "chip-active": @period == period } ], aria: { current: (@period == period ? "true" : nil) } %>
         <% end %>
       </div>
-    <% end %>
 
-    <div class="quick-filters currency-filter" aria-label="Currency">
-      <% DisplayCurrency::CODES.each do |code| %>
-        <%= link_to code, stats_path(request.query_parameters.merge(currency: code)), class: [ "chip", { "chip-active": @currency.code == code } ], aria: { current: (@currency.code == code ? "true" : nil) } %>
-      <% end %>
-      <% unless @currency.euros? %>
-        <span class="muted rate-note">1 € = <%= number_with_precision(@currency.rate, precision: 4, separator: ",") %> <%= @currency.unit %> (ECB, <%= l @currency.on, format: :long %>)</span>
+      <%= form_with url: stats_path, method: :get, class: "timeline-filter" do |form| %>
+        <span class="field"><%= form.label :from, "From" %> <%= form.date_field :from, value: @range.begin %></span>
+        <span class="field"><%= form.label :to, "To" %> <%= form.date_field :to, value: @range.end %></span>
+        <%= form.submit "Show", name: nil, class: "button" %>
       <% end %>
     </div>
-
-    <%= form_with url: stats_path, method: :get, class: "timeline-filter" do |form| %>
-      <span class="field"><%= form.label :from, "From" %> <%= form.date_field :from, value: @range.begin %></span>
-      <span class="field"><%= form.label :to, "To" %> <%= form.date_field :to, value: @range.end %></span>
-      <%= form.submit "Show", name: nil, class: "button" %>
-    <% end %>
-  </div>
+  </details>
 
   <div class="stat-tiles">
     <div class="stat-tile">
-      <span class="muted">Estimated net worth</span>
-      <strong><%= money(@net_worth.amount) %></strong>
-    </div>
-    <div class="stat-tile">
       <span class="muted">Income</span>
       <strong><%= money(@stats.income_total) %></strong>
+      <%= period_change(@stats.income_total, @previous_stats.income_total, against: @previous_range, higher_is_better: true) %>
     </div>
     <div class="stat-tile">
       <span class="muted">Expenses</span>
       <strong><%= money(@stats.expense_total) %></strong>
+      <%= period_change(@stats.expense_total, @previous_stats.expense_total, against: @previous_range, higher_is_better: false) %>
     </div>
     <div class="stat-tile">
       <span class="muted">Net</span>
-      <strong><%= money(@stats.net) %></strong>
+      <strong class="<%= class_names("amount-positive": @stats.net.positive?, "amount-negative": @stats.net.negative?) %>"><%= signed_money(@stats.net) %></strong>
     </div>
   </div>
-
-  <p class="muted ledger-note">Accounts <%= money(@net_worth.assets) %> − loans and credit cards <%= money(@net_worth.liabilities) %>. Estimates use the latest balance record plus booked transactions on later dates where available.</p>
-  <% if @net_worth.unknown_balance_count.positive? %>
-    <p class="muted ledger-note">Net worth excludes <%= pluralize(@net_worth.unknown_balance_count, "balance") %> without a recorded amount.</p>
-  <% end %>
-  <%= button_to "Refresh bank balances", balance_refreshes_path, params: { scope: @scope }, class: "button" %>
 
   <%= render "budget", report: @budget_report, budget: @budget, form_budget: @budget_form, categories: @budget_categories %>
 
@@ -80,6 +88,7 @@
     <div class="tabs" role="tablist">
       <button type="button" role="tab" class="tab" data-tabs-target="tab" data-tab="bar" data-action="tabs#select">Bar chart</button>
       <button type="button" role="tab" class="tab" data-tabs-target="tab" data-tab="pie" data-action="tabs#select">Pie chart</button>
+      <button type="button" role="tab" class="tab" data-tabs-target="tab" data-tab="net-worth" data-action="tabs#select">Net worth</button>
     </div>
 
     <div role="tabpanel" data-tabs-target="panel" data-tab="bar">
@@ -92,6 +101,41 @@
         <%= render "pie", title: "Income", slices: @stats.incomes, total: @stats.income_total %>
         <%= render "pie", title: "Expenses", slices: @stats.expenses, total: @stats.expense_total %>
       </div>
+    </div>
+
+    <div role="tabpanel" data-tabs-target="panel" data-tab="net-worth" hidden>
+      <section class="stats-section">
+        <div class="net-worth-now">
+          <div class="stat-tile">
+            <span class="muted">Estimated net worth</span>
+            <strong><%= money(@net_worth.amount) %></strong>
+          </div>
+          <% if @range.cover?(@today) %>
+            <%= button_to "Refresh bank balances", balance_refreshes_path, params: { scope: @scope }, class: "button" %>
+          <% end %>
+        </div>
+        <% if @net_worth.unknown_balance_count.positive? %>
+          <p class="muted ledger-note">Excludes <%= pluralize(@net_worth.unknown_balance_count, "balance") %> without a recorded amount.</p>
+        <% end %>
+
+        <div class="section-heading">
+          <h2>Net worth over time</h2>
+          <%= info_note do %>
+            Accounts <%= money(@net_worth.assets) %> − loans and credit cards <%= money(@net_worth.liabilities) %>.
+            Estimates use the latest balance record plus booked transactions on later dates where available.
+            The changes are from each point to today; missing balances are excluded.
+          <% end %>
+        </div>
+        <div class="chart-scroll"><%= net_worth_chart(@net_worth_history.points) %></div>
+        <div class="net-worth-changes">
+          <% @net_worth_history.changes.each do |change| %>
+            <div class="net-worth-change">
+              <span class="muted"><%= change.label %></span>
+              <strong><%= signed_money(change.amount) %></strong>
+            </div>
+          <% end %>
+        </div>
+      </section>
     </div>
   </div>
 

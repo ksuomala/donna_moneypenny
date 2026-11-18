@@ -1,5 +1,8 @@
 <section class="stats-section">
-  <h2>Loans <span class="muted"><%= money(total) %></span></h2>
+  <div class="section-heading">
+    <h2>Loans <span class="muted"><%= money(total) %></span></h2>
+    <%= info_note do %>Balance at the end of the period; taken and paid within it. Credit cards show what's owed and how it changed; their purchases are in the expenses. Loans are left out of income and expenses.<% end %>
+  </div>
   <p class="loans-summary">Taken <strong><%= money(taken) %></strong> · Paid <strong><%= money(paid) %></strong></p>
 
   <% if rows.empty? %>
@@ -38,6 +41,5 @@
         </tfoot>
       </table>
     </div>
-    <p class="muted ledger-note">Balance at the end of the period; taken and paid within it. Credit cards show what's owed and how it changed; their purchases are in the expenses. Loans are left out of income and expenses.</p>
   <% end %>
 </section>

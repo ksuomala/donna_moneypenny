@@ -9,12 +9,17 @@
     <% end %>
 
     <% rows = [ report.total ].compact + report.rows %>
-    <% max = rows.map(&:budget).max %>
+    <% max = rows.map(&:extent).max %>
+    <% scale = ->(amount) { max.zero? ? 0 : (amount * 100 / max).round(1) } %>
     <ul class="budget-rows">
       <% rows.each do |row| %>
         <li class="<%= class_names("budget-row", "budget-row-total": row.name == "Total", "budget-row-over": row.over?) %>">
           <span class="bar-label"><%= row.name %></span>
-          <span class="bar-track"><span class="budget-allotment" style="width: <%= max.zero? ? 100 : (row.budget * 100 / max).round(1) %>%"><span class="bar" style="width: <%= row.used %>%"></span></span></span>
+          <span class="bar-track">
+            <span class="budget-allotment" style="width: <%= scale.(row.budget) %>%"></span>
+            <span class="bar" style="width: <%= scale.(row.spent) %>%"></span>
+            <% if row.over? %><span class="budget-limit" style="left: <%= scale.(row.budget) %>%" title="Budget <%= money(row.budget) %>"></span><% end %>
+          </span>
           <span class="bar-value">
             <%= money(row.spent) %> <span class="muted">of <%= money(row.budget) %></span>
             · <%= row.over? ? "#{money(-row.left)} over" : "#{money(row.left)} left" %>

@@ -42,12 +42,11 @@ class BudgetReportTest < ActiveSupport::TestCase
     assert_nil BudgetReport.for(nil, BankTransactions::Stats.new(Date.new(2026, 10, 1).all_month, user: User.owner))
   end
 
-  test "lines are sorted by spending, biggest first, then by name" do
-    txn(-30, @cafes, Date.new(2026, 10, 4))
-    @budget.update!(lines_attributes: { "Groceries" => 400, "Cafes" => 50, "Books" => 20, "Arts" => 20 })
+  test "lines are sorted by budget, biggest first, then by name" do
+    @budget.update!(lines_attributes: { "Cafes" => 50, "Groceries" => 400, "Books" => 20, "Arts" => 20 })
     report = BudgetReport.for(@budget, BankTransactions::Stats.new(Date.new(2026, 10, 1).all_month, user: User.owner))
 
-    assert_equal %w[Cafes Arts Books Groceries], report.rows.map(&:name)
+    assert_equal %w[Groceries Cafes Arts Books], report.rows.map(&:name)
   end
 
   test "a budget without a total has only lines" do
@@ -55,6 +54,6 @@ class BudgetReportTest < ActiveSupport::TestCase
     report = BudgetReport.for(@budget, BankTransactions::Stats.new(Date.new(2026, 10, 1).all_month, user: User.owner))
 
     assert_nil report.total
-    assert_equal %w[Cafes Groceries], report.rows.map(&:name)
+    assert_equal %w[Groceries Cafes], report.rows.map(&:name)
   end
 end

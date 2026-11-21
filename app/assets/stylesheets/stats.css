@@ -550,6 +550,12 @@
   padding: 0.3rem 0.25rem;
 }
 
+.budget-allotment {
+  display: block;
+  height: 100%;
+  background: var(--track);
+}
+
 .budget-row .bar {
   background: var(--series-3);
 }

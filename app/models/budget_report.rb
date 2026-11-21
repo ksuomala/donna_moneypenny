@@ -39,9 +39,9 @@ class BudgetReport
 
   def rows
     spent = @stats.expenses.to_h { |slice| [ slice.name, slice.amount ] }
-    budget.lines.sort_by(&:category_name).map do |line|
+    budget.lines.map do |line|
       Row.new(name: line.category_name, budget: prorate(line.monthly_amount), spent: spent.fetch(line.category_name, BigDecimal(0)))
-    end
+    end.sort_by { |row| [ -row.spent, row.name ] }
   end
 
   private

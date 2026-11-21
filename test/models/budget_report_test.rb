@@ -22,7 +22,7 @@ class BudgetReportTest < ActiveSupport::TestCase
     assert_equal 1, report.months
     assert_not report.partial?
     assert_equal [ 1000, 380, 620 ], [ report.total.budget, report.total.spent, report.total.left ]
-    cafes, groceries = report.rows
+    groceries, cafes = report.rows
     assert_equal [ "Cafes", 50, 80, -30, true, 100 ], [ cafes.name, cafes.budget, cafes.spent, cafes.left, cafes.over?, cafes.used ]
     assert_equal [ "Groceries", 400, 300, 100, false, 75 ], [ groceries.name, groceries.budget, groceries.spent, groceries.left, groceries.over?, groceries.used ]
   end
@@ -36,10 +36,18 @@ class BudgetReportTest < ActiveSupport::TestCase
     assert_equal Date.new(2026, 10, 1)..Date.new(2026, 11, 30), year.range
     assert_equal 2, year.months
     assert_equal [ 2000, 300 ], [ year.total.budget, year.total.spent ]
-    assert_equal [ 800, 300 ], [ year.rows.last.budget, year.rows.last.spent ]
+    assert_equal [ 800, 300 ], [ year.rows.first.budget, year.rows.first.spent ]
 
     assert_nil BudgetReport.for(@budget, BankTransactions::Stats.new(Date.new(2026, 9, 1).all_month, user: User.owner))
     assert_nil BudgetReport.for(nil, BankTransactions::Stats.new(Date.new(2026, 10, 1).all_month, user: User.owner))
+  end
+
+  test "lines are sorted by spending, biggest first, then by name" do
+    txn(-30, @cafes, Date.new(2026, 10, 4))
+    @budget.update!(lines_attributes: { "Groceries" => 400, "Cafes" => 50, "Books" => 20, "Arts" => 20 })
+    report = BudgetReport.for(@budget, BankTransactions::Stats.new(Date.new(2026, 10, 1).all_month, user: User.owner))
+
+    assert_equal %w[Cafes Arts Books Groceries], report.rows.map(&:name)
   end
 
   test "a budget without a total has only lines" do

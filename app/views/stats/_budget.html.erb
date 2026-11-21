@@ -8,11 +8,12 @@
       <p class="muted">Monthly amounts × <%= number_with_precision(report.months, precision: 2, strip_insignificant_zeros: true) %> for this period.</p>
     <% end %>
 
-    <% rows = [ report.total ].compact + report.rows %>
+    <% rows = report.rows %>
     <% max = rows.map(&:extent).max %>
-    <% scale = ->(amount) { max.zero? ? 0 : (amount * 100 / max).round(1) } %>
     <ul class="budget-rows">
-      <% rows.each do |row| %>
+      <% ([ report.total ].compact + rows).each do |row| %>
+        <% extent = row.name == "Total" ? row.extent : max %>
+        <% scale = ->(amount) { extent.zero? ? 0 : (amount * 100 / extent).round(1) } %>
         <li class="<%= class_names("budget-row", "budget-row-total": row.name == "Total", "budget-row-over": row.over?) %>">
           <span class="bar-label"><%= row.name %></span>
           <span class="bar-track">

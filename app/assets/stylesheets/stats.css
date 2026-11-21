@@ -584,6 +584,11 @@
 
 .budget-row-total {
   font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.budget-row-total .bar-track {
+  height: 1.25rem;
 }
 
 .budget-form-details summary {

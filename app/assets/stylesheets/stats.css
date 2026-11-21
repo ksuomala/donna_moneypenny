@@ -550,14 +550,32 @@
   padding: 0.3rem 0.25rem;
 }
 
+.budget-row .bar-track {
+  position: relative;
+}
+
+.budget-allotment,
+.budget-row .bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+
 .budget-allotment {
-  display: block;
-  height: 100%;
   background: var(--track);
 }
 
 .budget-row .bar {
+  height: auto;
   background: var(--series-3);
+}
+
+.budget-limit {
+  position: absolute;
+  top: -0.2rem;
+  bottom: -0.2rem;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
 }
 
 .budget-row-over .bar {

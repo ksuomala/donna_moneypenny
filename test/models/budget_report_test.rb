@@ -23,8 +23,8 @@ class BudgetReportTest < ActiveSupport::TestCase
     assert_not report.partial?
     assert_equal [ 1000, 380, 620 ], [ report.total.budget, report.total.spent, report.total.left ]
     groceries, cafes = report.rows
-    assert_equal [ "Cafes", 50, 80, -30, true, 100 ], [ cafes.name, cafes.budget, cafes.spent, cafes.left, cafes.over?, cafes.used ]
-    assert_equal [ "Groceries", 400, 300, 100, false, 75 ], [ groceries.name, groceries.budget, groceries.spent, groceries.left, groceries.over?, groceries.used ]
+    assert_equal [ "Cafes", 50, 80, -30, true, 160 ], [ cafes.name, cafes.budget, cafes.spent, cafes.left, cafes.over?, cafes.percent ]
+    assert_equal [ "Groceries", 400, 300, 100, false, 75 ], [ groceries.name, groceries.budget, groceries.spent, groceries.left, groceries.over?, groceries.percent ]
   end
 
   test "a longer period prorates the monthly amounts, and a budget starting mid-period covers its own part" do
